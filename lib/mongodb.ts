@@ -1,6 +1,6 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/rewards_db";
+const uri = process.env.MONGODB_URI;
 const options = {};
 
 let client: MongoClient;
