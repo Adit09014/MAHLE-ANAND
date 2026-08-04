@@ -1,5 +1,73 @@
-import { Cycle, Nomination, PanelScoreResult, CategoryResult } from "./types";
+import { Cycle, Nomination, PanelScoreResult, CategoryResult, CycleTimeline, PhaseTimeline } from "./types";
 import { CATEGORIES } from "./constants";
+
+export function getDefaultTimeline(month: string): CycleTimeline {
+  const [year, mStr] = month.split("-");
+  const y = Number(year) || 2026;
+  const m = Number(mStr) || 8;
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return {
+    nomination: {
+      startDate: `${y}-${pad(m)}-01`,
+      endDate: `${y}-${pad(m)}-07`,
+      isExtended: false,
+    },
+    hodEndorsement: {
+      startDate: `${y}-${pad(m)}-01`,
+      endDate: `${y}-${pad(m)}-09`,
+      isExtended: false,
+    },
+    panelScoring: {
+      startDate: `${y}-${pad(m)}-10`,
+      endDate: `${y}-${pad(m)}-12`,
+      isExtended: false,
+    },
+  };
+}
+
+export function getCycleTimeline(cycle: Cycle): CycleTimeline {
+  const def = getDefaultTimeline(cycle.month);
+  if (!cycle.timeline) return def;
+  return {
+    nomination: { ...def.nomination, ...(cycle.timeline.nomination || {}) },
+    hodEndorsement: { ...def.hodEndorsement, ...(cycle.timeline.hodEndorsement || {}) },
+    panelScoring: { ...def.panelScoring, ...(cycle.timeline.panelScoring || {}) },
+  };
+}
+
+export function getEffectiveEndDate(phase: PhaseTimeline): string {
+  if (phase.isExtended && phase.extendedUntil) {
+    return phase.extendedUntil;
+  }
+  return phase.endDate;
+}
+
+export function addDaysToDateStr(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return dateStr;
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function formatDatePretty(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return dateStr;
+  const day = d.getDate();
+  const month = d.toLocaleDateString("en-IN", { month: "short" });
+  const suffix =
+    day === 1 || day === 21 || day === 31
+      ? "st"
+      : day === 2 || day === 22
+      ? "nd"
+      : day === 3 || day === 23
+      ? "rd"
+      : "th";
+  return `${day}${suffix} ${month}`;
+}
 
 export function emptyCycle(month: string): Cycle {
   return {
@@ -14,6 +82,7 @@ export function emptyCycle(month: string): Cycle {
     endorsed: {},
     scores: {},
     announcedAt: null,
+    timeline: getDefaultTimeline(month),
   };
 }
 

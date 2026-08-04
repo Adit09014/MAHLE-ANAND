@@ -40,6 +40,20 @@ export interface Nomination {
   hrNote?: string;
 }
 
+export interface PhaseTimeline {
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  isExtended?: boolean;
+  extendedUntil?: string; // YYYY-MM-DD
+  extendedDays?: number;
+}
+
+export interface CycleTimeline {
+  nomination: PhaseTimeline;
+  hodEndorsement: PhaseTimeline;
+  panelScoring: PhaseTimeline;
+}
+
 export interface Cycle {
   month: string;
   stage: string;
@@ -48,6 +62,7 @@ export interface Cycle {
   endorsed: Record<string, Record<string, string>>;
   scores: Record<string, Record<string, number>>;
   announcedAt: string | null;
+  timeline?: CycleTimeline;
 }
 
 export interface Win {
@@ -75,6 +90,7 @@ export interface AuthUser {
   name: string;
   code?: string;
   unitId?: string;
+  designation?: string;
   judgeId?: string;
   isPanelJudge?: boolean;
   gender?: string;

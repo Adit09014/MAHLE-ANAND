@@ -4,33 +4,34 @@ import React, { useState, useEffect } from "react";
 
 export interface BrandMarkProps {
   url?: string;
+  className?: string;
+  bgWhite?: boolean;
 }
 
-export const BrandMark: React.FC<BrandMarkProps> = ({ url }) => {
+export const BrandMark: React.FC<BrandMarkProps> = ({ url, className, bgWhite }) => {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
 
-  if (url && !failed) {
+  const logoSrc = url && !failed ? url : "/MAHLE-Logo.png";
+
+  const imgElement = (
+    <img
+      src={logoSrc}
+      alt="MAHLE"
+      onError={() => setFailed(true)}
+      className={`h-11 sm:h-14 w-auto object-contain ${className || ""}`}
+    />
+  );
+
+  if (bgWhite) {
     return (
-      <img
-        src={url}
-        alt="MAHLE"
-        onError={() => setFailed(true)}
-        className="h-10 w-auto rounded bg-white p-1.5"
-      />
+      <div className="inline-block rounded-lg bg-white p-2.5 shadow-sm">
+        {imgElement}
+      </div>
     );
   }
 
-  return (
-    <div className="flex items-center rounded bg-white px-3.5 py-2">
-      <span
-        className="text-xl font-bold uppercase leading-none"
-        style={{ color: "#00A03C", letterSpacing: "0.02em" }}
-      >
-        MAHLE
-      </span>
-    </div>
-  );
+  return imgElement;
 };
 
 export default BrandMark;

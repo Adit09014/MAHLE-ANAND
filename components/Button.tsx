@@ -13,16 +13,16 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const tones: Record<ButtonTone, string> = {
     solid:
-      "bg-blue-800 text-white hover:bg-blue-900 disabled:bg-blue-900/25",
+      "bg-gradient-to-r from-blue-800 to-blue-900 text-white hover:from-blue-900 hover:to-blue-950 shadow-sm hover:shadow-md shadow-blue-900/20 active:scale-[0.98] disabled:opacity-40 disabled:scale-100",
     quiet:
-      "bg-white text-blue-900 border border-blue-900/20 hover:border-blue-800 disabled:text-blue-900/30",
+      "bg-white text-blue-950 border border-blue-900/15 hover:border-blue-700 hover:bg-blue-50/50 shadow-sm active:scale-[0.98] disabled:opacity-40 disabled:scale-100",
     danger:
-      "bg-white text-red-800 border border-red-800/30 hover:bg-red-50 disabled:text-red-800/30",
+      "bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 shadow-sm hover:shadow-md shadow-red-700/20 active:scale-[0.98] disabled:opacity-40 disabled:scale-100",
   };
   return (
     <button
       {...props}
-      className={`inline-flex items-center gap-2 rounded px-3.5 py-2 text-xs font-semibold uppercase tracking-wider transition disabled:cursor-not-allowed ${tones[tone]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-150 disabled:cursor-not-allowed ${tones[tone]} ${className}`}
     />
   );
 };

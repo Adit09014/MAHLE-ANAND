@@ -1,9 +1,22 @@
 import { MongoClient } from "mongodb";
+import crypto from "crypto";
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/rewards_db";
 
 const now = new Date();
 const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+function generateDefaultPassword(code, name) {
+  const cleanCode = (code || "").trim();
+  const codePart = cleanCode.length >= 4 ? cleanCode.slice(-4) : cleanCode;
+  const cleanName = (name || "").replace(/[^a-zA-Z]/g, "");
+  const namePart = cleanName.length >= 4 ? cleanName.slice(0, 4) : cleanName;
+  return `${codePart}${namePart}`;
+}
+
+function hashPassword(password) {
+  return crypto.createHash("sha256").update(password.trim()).digest("hex");
+}
 
 const sampleEmployees = [
   { code: "M1001", name: "Rajesh Kumar", unitId: "khandsa", gender: "Male", designation: "Production Manager", role: "hod", isPanelJudge: true, email: "m1001@mahle.com" },
@@ -39,15 +52,18 @@ async function seed() {
     await client.connect();
     const db = client.db();
 
-    // Seed Employees master collection
+    // Seed Employees master collection with hashed passwords
     for (const emp of sampleEmployees) {
+      const plainPassword = generateDefaultPassword(emp.code, emp.name);
+      const passwordHash = hashPassword(plainPassword);
       await db.collection("employees").updateOne(
         { code: emp.code },
-        { $set: { ...emp, updatedAt: new Date() } },
+        { $set: { ...emp, passwordHash, updatedAt: new Date() } },
         { upsert: true }
       );
+      console.log(`  -> Employee ${emp.code} (${emp.name}): Password '${plainPassword}' => Hash '${passwordHash.slice(0, 10)}...'`);
     }
-    console.log(`✓ Seeded ${sampleEmployees.length} employee records into 'employees' collection`);
+    console.log(`✓ Seeded ${sampleEmployees.length} employee records with hashed credentials into 'employees' collection`);
 
     // Seed cycle
     await db.collection("cycles").updateOne(

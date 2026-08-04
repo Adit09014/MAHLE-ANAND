@@ -1,13 +1,13 @@
-"use client";
-
 import React, { useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, Clock, Calendar } from "lucide-react";
 import { UNITS, CATEGORIES, catById, unitById } from "../lib/constants";
 import { AuthUser, Cycle, Nomination } from "../lib/types";
+import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
 import Card from "../components/Card";
 import Label from "../components/Label";
 import Button from "../components/Button";
 import Empty from "../components/Empty";
+import Pill from "../components/Pill";
 
 const inputCls =
   "w-full rounded border border-blue-900/15 bg-white px-3 py-2 text-sm text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20";
@@ -55,6 +55,9 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
     }
   }, [currentUser]);
 
+  const timeline = getCycleTimeline(cycle);
+  const nomPhase = timeline.nomination;
+  const effectiveEnd = getEffectiveEndDate(nomPhase);
   const open = cycle.stage === "nomination" && !locked;
   const cat = catById(f.category);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
@@ -106,16 +109,34 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <Card className="p-5">
-        <h2 className="text-base font-semibold tracking-tight">
-          Self-Nomination
-        </h2>
-        <p className="mt-1 text-xs text-blue-900/60">
-          Your profile details are auto-filled. You can nominate yourself across multiple categories.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/10 pb-3">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight">
+              Self-Nomination
+            </h2>
+            <p className="mt-0.5 text-xs text-blue-900/60">
+              Your profile details are auto-filled. You can nominate yourself across multiple categories.
+            </p>
+          </div>
+          {nomPhase.isExtended && (
+            <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-900">
+              <Clock size={12} /> Deadline Extended to {formatDatePretty(effectiveEnd)}
+            </span>
+          )}
+        </div>
+
+        {/* Timeline Information Banner */}
+        <div className="mt-3 flex items-center gap-2 rounded bg-blue-900/5 px-3 py-2 text-xs text-blue-950 font-medium">
+          <Calendar size={14} className="text-blue-700 shrink-0" />
+          <span>
+            Form Filling Window: <strong>{formatDatePretty(nomPhase.startDate)}</strong> – <strong>{formatDatePretty(effectiveEnd)}</strong>
+            {nomPhase.isExtended ? " (Admin Extended)" : ""}
+          </span>
+        </div>
 
         {!open && (
-          <div className="mt-4 flex items-center gap-2 rounded border border-blue-900/15 bg-blue-900/5 px-3 py-2 text-xs">
-            <Lock size={13} /> The nomination window is closed for this cycle.
+          <div className="mt-3 flex items-center gap-2 rounded border border-blue-900/15 bg-blue-900/5 px-3 py-2 text-xs font-medium text-blue-900/80">
+            <Lock size={13} /> The nomination window is currently closed for this cycle.
           </div>
         )}
 
@@ -144,7 +165,6 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
               className={readOnlyCls}
               value={f.unit}
               disabled
-              readOnly
             >
               {UNITS.map((u) => (
                 <option key={u.id} value={u.id}>

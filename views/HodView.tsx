@@ -1,9 +1,10 @@
 "use client";
 
 import React from "react";
-import { Lock } from "lucide-react";
+import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck } from "lucide-react";
 import { unitById, CATEGORIES, MAX_CATEGORIES_PER_UNIT, STAGES } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
+import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
 import Card from "../components/Card";
 import Label from "../components/Label";
 import Button from "../components/Button";
@@ -22,6 +23,9 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked 
   const mine = cycle.nominations.filter((n) => n.unit === unitId);
   const picks = cycle.endorsed[unitId] || {};
   const usedCats = Object.keys(picks).filter((c) => picks[c]);
+  const timeline = getCycleTimeline(cycle);
+  const hodPhase = timeline.hodEndorsement;
+  const effectiveEnd = getEffectiveEndDate(hodPhase);
   const open = ["nomination", "validation"].includes(cycle.stage) && !locked;
 
   const toggle = (nom: Nomination) => {
@@ -31,7 +35,7 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked 
     } else {
       if (!next[nom.category] && usedCats.length >= MAX_CATEGORIES_PER_UNIT)
         return;
-      next[nom.category] = nom.id;
+      next[nom.category] = nom.id; // Enforces 1 employee per category
     }
     commit({
       ...cycle,
@@ -41,6 +45,29 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked 
 
   return (
     <div className="space-y-5">
+      {/* Policy Guidance Banner */}
+      <div className="rounded-xl border border-blue-900/15 bg-gradient-to-r from-blue-900/5 via-blue-900/10 to-blue-900/5 p-4 text-xs text-blue-950 shadow-sm">
+        <div className="flex items-start gap-2.5">
+          <ShieldCheck size={20} className="text-blue-800 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="font-bold text-blue-950 text-sm tracking-tight flex items-center gap-2">
+              HOD Endorsement &amp; Selection Policy
+            </h4>
+            <p className="text-blue-900/80 leading-relaxed">
+              Each HOD reviews entries from their department and forwards <strong>one employee per category</strong>, for a <strong>maximum of 2 categories</strong> that month.
+            </p>
+            <div className="pt-1 flex flex-wrap items-center gap-2 font-mono text-[11px]">
+              <span className="rounded-md bg-blue-900/10 px-2 py-0.5 font-semibold text-blue-900 border border-blue-900/15">
+                Rule 1: Max 1 Employee Per Category
+              </span>
+              <span className="rounded-md bg-blue-900/10 px-2 py-0.5 font-semibold text-blue-900 border border-blue-900/15">
+                Rule 2: Max 2 Categories Per Month ({usedCats.length}/{MAX_CATEGORIES_PER_UNIT} Used)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <Card className="flex flex-wrap items-center gap-x-6 gap-y-3 p-5">
         <div>
           <Label>Endorsing as HOD</Label>
@@ -66,6 +93,21 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked 
           </div>
         </div>
       </Card>
+
+      {/* Timeline & Extension Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded bg-blue-900/5 px-4 py-3 text-xs text-blue-950 font-medium">
+        <div className="flex items-center gap-2">
+          <Calendar size={15} className="text-blue-700 shrink-0" />
+          <span>
+            HOD Approval &amp; Pushing Timeline: <strong>{formatDatePretty(hodPhase.startDate)}</strong> – <strong>{formatDatePretty(effectiveEnd)}</strong>
+          </span>
+        </div>
+        {hodPhase.isExtended && (
+          <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-900">
+            <Clock size={12} /> Extended until {formatDatePretty(effectiveEnd)}
+          </span>
+        )}
+      </div>
 
       {!open && (
         <div className="flex items-center gap-2 rounded border border-blue-900/15 bg-white px-3 py-2 text-xs">

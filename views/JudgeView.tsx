@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { Lock } from "lucide-react";
+import { Lock, Clock, Calendar } from "lucide-react";
 import { CATEGORIES, unitById } from "../lib/constants";
-import { endorsedList } from "../lib/helpers";
+import { endorsedList, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
 import { Cycle } from "../lib/types";
 import Card from "../components/Card";
 import Label from "../components/Label";
@@ -20,6 +20,9 @@ export interface JudgeViewProps {
 export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, locked }) => {
   const judge = cycle.judges.find((j) => j.id === judgeId);
   const pool = endorsedList(cycle);
+  const timeline = getCycleTimeline(cycle);
+  const judgePhase = timeline.panelScoring;
+  const effectiveEnd = getEffectiveEndDate(judgePhase);
   const open = cycle.stage === "judging" && !locked;
 
   const setScore = (nomId: string, raw: string) => {
@@ -51,6 +54,20 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
         <p className="mt-3 text-xs leading-relaxed text-blue-900/60">
           Enter a score from 0–10 per nominee. <strong>Confidentiality Note:</strong> Overall panel average scores and full results are strictly restricted to Admin visibility.
         </p>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded bg-blue-900/5 px-3 py-2 text-xs text-blue-950 font-medium">
+          <div className="flex items-center gap-2">
+            <Calendar size={14} className="text-blue-700 shrink-0" />
+            <span>
+              Panel Scoring Timeline: <strong>{formatDatePretty(judgePhase.startDate)}</strong> – <strong>{formatDatePretty(effectiveEnd)}</strong>
+            </span>
+          </div>
+          {judgePhase.isExtended && (
+            <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+              <Clock size={12} /> Extended until {formatDatePretty(effectiveEnd)}
+            </span>
+          )}
+        </div>
       </Card>
 
       {!open ? (

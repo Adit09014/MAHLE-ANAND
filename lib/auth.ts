@@ -14,7 +14,7 @@ export async function getAuthSession(): Promise<AuthSession> {
 
 export async function loginUser(payload: {
   role: string;
-  name: string;
+  name?: string;
   code?: string;
   unitId?: string;
   judgeId?: string;
