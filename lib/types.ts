@@ -22,6 +22,8 @@ export interface Stage {
 export interface Judge {
   id: string;
   name: string;
+  code?: string;
+  isPanelJudge?: boolean;
 }
 
 export interface Nomination {
@@ -74,6 +76,8 @@ export interface AuthUser {
   code?: string;
   unitId?: string;
   judgeId?: string;
+  isPanelJudge?: boolean;
+  gender?: string;
 }
 
 export interface AuthSession {

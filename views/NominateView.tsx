@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Lock } from "lucide-react";
 import { UNITS, CATEGORIES, catById, unitById } from "../lib/constants";
-import { Cycle, Nomination } from "../lib/types";
+import { AuthUser, Cycle, Nomination } from "../lib/types";
 import Card from "../components/Card";
 import Label from "../components/Label";
 import Button from "../components/Button";
@@ -11,6 +11,9 @@ import Empty from "../components/Empty";
 
 const inputCls =
   "w-full rounded border border-blue-900/15 bg-white px-3 py-2 text-sm text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20";
+
+const readOnlyCls =
+  "w-full rounded border border-blue-900/15 bg-blue-900/5 px-3 py-2 text-sm font-medium text-blue-950 outline-none cursor-not-allowed";
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <label className="block">
@@ -22,30 +25,47 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 export interface NominateViewProps {
   cycle: Cycle;
   commit: (next: Cycle) => void;
+  currentUser?: AuthUser | null;
   locked: boolean;
 }
 
-export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, locked }) => {
-  const blank = {
-    name: "",
-    code: "",
-    unit: UNITS[0].id,
+export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, currentUser, locked }) => {
+  const [f, setF] = React.useState({
+    name: currentUser?.name || "",
+    code: currentUser?.code || "",
+    unit: currentUser?.unitId || UNITS[0].id,
     category: CATEGORIES[0].id,
-    gender: "",
+    gender: currentUser?.gender || "",
     citation: "",
     evidence: "",
-  };
-  const [f, setF] = useState(blank);
+  });
+
   const [msg, setMsg] = useState<{ bad: boolean; text: string } | null>(null);
+
+  // Sync profile data when currentUser updates
+  React.useEffect(() => {
+    if (currentUser) {
+      setF((prev) => ({
+        ...prev,
+        name: currentUser.name || prev.name,
+        code: currentUser.code || prev.code,
+        unit: currentUser.unitId || prev.unit,
+        gender: currentUser.gender || prev.gender,
+      }));
+    }
+  }, [currentUser]);
 
   const open = cycle.stage === "nomination" && !locked;
   const cat = catById(f.category);
-  const set = (k: keyof typeof blank, v: string) => setF((p) => ({ ...p, [k]: v }));
+  const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
   const submit = () => {
-    const code = f.code.trim().toUpperCase();
-    if (!f.name.trim() || !code)
-      return setMsg({ bad: true, text: "Name and employee code are both required." });
+    const code = (f.code || currentUser?.code || "").trim().toUpperCase();
+    const name = (f.name || currentUser?.name || "").trim();
+    const unit = f.unit || currentUser?.unitId || UNITS[0].id;
+
+    if (!name || !code)
+      return setMsg({ bad: true, text: "Your employee profile details could not be found." });
     if (f.citation.trim().length < 40)
       return setMsg({
         bad: true,
@@ -54,19 +74,21 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, locke
     if (cat?.splitByGender && !f.gender)
       return setMsg({
         bad: true,
-        text: "Employee of the Month is declared for a male and a female winner — pick one.",
+        text: "Employee of the Month is declared for a male and a female winner — pick your gender below.",
       });
-    if (cycle.nominations.some((n) => n.code === code))
+
+    // One self-nomination allowed per category per employee
+    if (cycle.nominations.some((n) => n.code === code && n.category === f.category))
       return setMsg({
         bad: true,
-        text: `${code} already has a nomination this month. One category per employee per month.`,
+        text: `You have already filed a nomination under '${cat?.name}' for this month. You may nominate yourself in other categories.`,
       });
 
     const nom: Nomination = {
-      id: `${code}-${Date.now()}`,
-      name: f.name.trim(),
+      id: `${code}-${f.category}-${Date.now()}`,
+      name,
       code,
-      unit: f.unit,
+      unit,
       category: f.category,
       gender: cat?.splitByGender ? f.gender : "",
       citation: f.citation.trim(),
@@ -75,19 +97,20 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, locke
       validated: null,
       hrNote: "",
     };
+
     commit({ ...cycle, nominations: [...cycle.nominations, nom] });
-    setF(blank);
-    setMsg({ bad: false, text: `Nomination filed for ${nom.name}.` });
+    setF((prev) => ({ ...prev, citation: "", evidence: "" }));
+    setMsg({ bad: false, text: `Self-nomination successfully filed under ${cat?.name}.` });
   };
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <Card className="p-5">
         <h2 className="text-base font-semibold tracking-tight">
-          Self-nomination
+          Self-Nomination
         </h2>
         <p className="mt-1 text-xs text-blue-900/60">
-          One category per employee per month. Your HOD picks who goes forward.
+          Your profile details are auto-filled. You can nominate yourself across multiple categories.
         </p>
 
         {!open && (
@@ -97,28 +120,31 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, locke
         )}
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Field label="Employee name">
+          {/* Locked Profile Fields - Self Nomination Only */}
+          <Field label="Employee Name (Auto-Filled)">
             <input
-              className={inputCls}
+              className={readOnlyCls}
               value={f.name}
-              disabled={!open}
-              onChange={(e) => set("name", e.target.value)}
+              readOnly
+              disabled
+              title="Locked to your registered profile"
             />
           </Field>
-          <Field label="Employee code">
+          <Field label="Employee Code (Auto-Filled)">
             <input
-              className={`${inputCls} font-mono uppercase`}
+              className={`${readOnlyCls} font-mono uppercase`}
               value={f.code}
-              disabled={!open}
-              onChange={(e) => set("code", e.target.value)}
+              readOnly
+              disabled
+              title="Locked to your registered profile"
             />
           </Field>
-          <Field label="Department / plant">
+          <Field label="Department / Plant (Auto-Filled)">
             <select
-              className={inputCls}
+              className={readOnlyCls}
               value={f.unit}
-              disabled={!open}
-              onChange={(e) => set("unit", e.target.value)}
+              disabled
+              readOnly
             >
               {UNITS.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -127,7 +153,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, locke
               ))}
             </select>
           </Field>
-          <Field label="Award category">
+          <Field label="Award Category">
             <select
               className={inputCls}
               value={f.category}
@@ -142,14 +168,14 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, locke
             </select>
           </Field>
           {cat?.splitByGender && (
-            <Field label="Declared under">
+            <Field label="Declared Under">
               <select
                 className={inputCls}
                 value={f.gender}
                 disabled={!open}
                 onChange={(e) => set("gender", e.target.value)}
               >
-                <option value="">Select</option>
+                <option value="">Select Gender</option>
                 <option>Male</option>
                 <option>Female</option>
               </select>
@@ -196,7 +222,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, locke
 
         <div className="mt-4">
           <Button onClick={submit} disabled={!open}>
-            Submit nomination
+            Submit Self-Nomination
           </Button>
         </div>
       </Card>

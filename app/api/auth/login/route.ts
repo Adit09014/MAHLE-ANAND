@@ -8,8 +8,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { role, name, code, unitId, judgeId, password } = body;
 
-    if (!role || !["employee", "hod", "judge", "hr"].includes(role)) {
-      return NextResponse.json({ error: "Invalid role specified." }, { status: 400 });
+    if (!role || !["employee", "hr"].includes(role)) {
+      return NextResponse.json({ error: "Invalid login type specified." }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -29,8 +29,10 @@ export async function POST(request: Request) {
         name: hrRecord ? hrRecord.name : name?.trim() || "HR Administrator",
         code: hrRecord ? hrRecord.code : "HR001",
         unitId: hrRecord ? hrRecord.unitId : "hr",
+        isPanelJudge: true,
       };
-    } else if (role === "employee") {
+    } else {
+      // Employee login option (handles regular Employee, HOD, and HOD/Employee Panel Judge)
       if (!code || !code.trim()) {
         return NextResponse.json({ error: "Employee code is required." }, { status: 400 });
       }
@@ -45,70 +47,38 @@ export async function POST(request: Request) {
         );
       }
 
-      verifiedUser = {
-        role: "employee",
-        name: empRecord.name,
-        code: empRecord.code,
-        unitId: empRecord.unitId,
-      };
-    } else if (role === "hod") {
-      if (!unitId) {
-        return NextResponse.json({ error: "Please select a department or plant." }, { status: 400 });
-      }
-
-      // Check for HOD record for this unit or code match
-      let hodRecord = null;
-      if (code && code.trim()) {
-        const inputCode = code.trim().toUpperCase();
-        hodRecord = await db.collection("employees").findOne({ code: inputCode, unitId });
-      }
-
-      if (!hodRecord) {
-        hodRecord = await db.collection("employees").findOne({ unitId, role: "hod" });
-      }
-
-      if (!hodRecord) {
-        // Fallback check: any employee under this unit
-        hodRecord = await db.collection("employees").findOne({ unitId });
-      }
-
-      if (!hodRecord) {
-        return NextResponse.json(
-          { error: `No registered employee or HOD record found in database for selected unit.` },
-          { status: 401 }
-        );
-      }
-
-      verifiedUser = {
-        role: "hod",
-        name: name?.trim() || hodRecord.name,
-        code: hodRecord.code,
-        unitId: hodRecord.unitId,
-      };
-    } else if (role === "judge") {
-      if (!judgeId) {
-        return NextResponse.json({ error: "Please select a panel judge position." }, { status: 400 });
-      }
-
       const now = new Date();
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const cycle = await db.collection("cycles").findOne({ month: currentMonth });
 
-      let judgeName = name?.trim() || `Judge ${judgeId.toUpperCase()}`;
-      if (cycle && cycle.judges) {
-        const assignedJudge = cycle.judges.find((j: { id: string; name: string }) => j.id === judgeId);
-        if (assignedJudge && assignedJudge.name) {
-          judgeName = assignedJudge.name;
+      const isPanelJudge = Boolean(empRecord.isPanelJudge);
+      let assignedJudgeSlot: string | undefined = undefined;
+
+      if (isPanelJudge && cycle && cycle.judges) {
+        const found = cycle.judges.find(
+          (j: { id: string; name?: string; code?: string }) =>
+            (j.code && j.code.toUpperCase() === empCode) ||
+            (j.name && j.name.toLowerCase().includes(empRecord.name.toLowerCase()))
+        );
+        if (found) {
+          assignedJudgeSlot = found.id;
+        } else {
+          // Default fallback slot if not specifically indexed in cycle
+          assignedJudgeSlot = "j1";
         }
       }
 
+      const userRole = empRecord.role === "hod" ? "hod" : "employee";
+
       verifiedUser = {
-        role: "judge",
-        name: judgeName,
-        judgeId,
+        role: userRole,
+        name: empRecord.name,
+        code: empRecord.code,
+        unitId: empRecord.unitId,
+        isPanelJudge,
+        judgeId: assignedJudgeSlot,
+        gender: empRecord.gender || "",
       };
-    } else {
-      return NextResponse.json({ error: "Invalid role specified." }, { status: 400 });
     }
 
     const cookieStore = await cookies();

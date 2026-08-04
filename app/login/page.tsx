@@ -57,11 +57,9 @@ export default function LoginPage() {
     }
   };
 
-  const roleTabs: Array<{ id: Role; label: string; icon: React.ComponentType<{ size?: number }> }> = [
-    { id: "employee", label: "Employee", icon: ClipboardList },
-    { id: "hod", label: "HOD", icon: ShieldCheck },
-    { id: "judge", label: "Judge", icon: Scale },
-    { id: "hr", label: "HR Admin", icon: Trophy },
+  const loginTabs = [
+    { id: "employee", label: "Employee Login", icon: ClipboardList, desc: "Employee, HOD, & Panel Judge" },
+    { id: "hr", label: "Admin Login", icon: Trophy, desc: "HR & System Administrators" },
   ];
 
   return (
@@ -81,7 +79,7 @@ export default function LoginPage() {
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-sky-200/80">
-            <DatabaseCheck size={14} className="text-emerald-400" /> MongoDB-Verified Login
+            <DatabaseCheck size={14} className="text-emerald-400" /> MongoDB-Verified Authorization
           </div>
         </div>
       </header>
@@ -94,30 +92,34 @@ export default function LoginPage() {
               Sign In to Your Account
             </h2>
             <p className="mt-1 text-xs text-blue-900/60">
-              Credentials are verified against the MongoDB employee database.
+              Select your login type below to proceed.
             </p>
           </div>
 
-          {/* Role Tabs */}
-          <div className="mb-6 grid grid-cols-4 gap-1 rounded-lg bg-blue-900/5 p-1">
-            {roleTabs.map((t) => {
+          {/* Two-Option Login Selection */}
+          <div className="mb-6 grid grid-cols-2 gap-2 rounded-lg bg-blue-900/5 p-1.5">
+            {loginTabs.map((t) => {
               const Icon = t.icon;
+              const isSel = role === t.id;
               return (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => {
-                    setRole(t.id);
+                    setRole(t.id as Role);
                     setError(null);
                   }}
-                  className={`flex flex-col items-center gap-1 rounded-md py-2 text-xs font-semibold transition ${
-                    role === t.id
+                  className={`flex flex-col items-center gap-1 rounded-md py-3 px-2 text-xs font-semibold transition ${
+                    isSel
                       ? "bg-blue-800 text-white shadow-sm"
                       : "text-blue-900/60 hover:text-blue-950 hover:bg-white/50"
                   }`}
                 >
-                  <Icon size={16} />
+                  <Icon size={18} />
                   <span>{t.label}</span>
+                  <span className={`text-[10px] font-normal ${isSel ? "text-blue-100" : "text-blue-900/50"}`}>
+                    {t.desc}
+                  </span>
                 </button>
               );
             })}
@@ -131,95 +133,31 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {role === "employee" && (
+            {role === "employee" ? (
               <>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1.5">
-                    Employee Code (DB Verified)
+                    Employee Code (MongoDB Verified)
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. M1003"
+                    placeholder="e.g. M1001, M1003, M1005"
                     className={`${inputCls} font-mono uppercase`}
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                   />
                 </div>
                 <div className="rounded bg-blue-900/5 p-3 text-xs leading-relaxed text-blue-900/70">
-                  <p className="font-semibold text-blue-950">Registered DB Employee Codes:</p>
-                  <p className="mt-1 font-mono text-[11px] text-blue-800">
-                    M1001 (Khandsa), M1002 (HR), M1003 (Pune), M1004 (R&amp;D), M1005 (Ops), M1006 (Quality), M1007 (Purchase), M1008 (Finance)
-                  </p>
+                  <p className="font-semibold text-blue-950">Sample Registered DB Codes:</p>
+                  <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-blue-800">
+                    <li>• <strong className="text-blue-950">M1003</strong>: Employee (Self Nomination)</li>
+                    <li>• <strong className="text-blue-950">M1001</strong>: HOD &amp; Panel Judge</li>
+                    <li>• <strong className="text-blue-950">M1005</strong>: HOD &amp; Panel Judge</li>
+                  </ul>
                 </div>
               </>
-            )}
-
-            {role === "hod" && (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1.5">
-                    Department / Plant Unit
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={unitId}
-                    onChange={(e) => setUnitId(e.target.value)}
-                  >
-                    {UNITS.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.kind === "Plant" ? `Plant — ${u.name}` : u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1.5">
-                    HOD Employee Code (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. M1001 or M1005"
-                    className={`${inputCls} font-mono uppercase`}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            {role === "judge" && (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1.5">
-                    Panel Position
-                  </label>
-                  <select
-                    className={inputCls}
-                    value={judgeId}
-                    onChange={(e) => setJudgeId(e.target.value)}
-                  >
-                    <option value="j1">Judge 1</option>
-                    <option value="j2">Judge 2</option>
-                    <option value="j3">Judge 3</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1.5">
-                    Judge Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Ramesh Kumar"
-                    className={inputCls}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
-
-            {role === "hr" && (
+            ) : (
               <>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1.5">

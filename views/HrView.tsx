@@ -27,6 +27,8 @@ interface HodEmployee {
   code: string;
   name: string;
   unitId: string;
+  role?: string;
+  isPanelJudge?: boolean;
 }
 
 export interface HrViewProps {
@@ -50,7 +52,7 @@ export const HrView: React.FC<HrViewProps> = ({
 }) => {
   const [logoDraft, setLogoDraft] = useState(brand.logoUrl || "");
   const [logoSaved, setLogoSaved] = useState(false);
-  const [hods, setHods] = useState<HodEmployee[]>([]);
+  const [hodsList, setHodsList] = useState<HodEmployee[]>([]);
 
   useEffect(() => {
     async function fetchHods() {
@@ -58,7 +60,7 @@ export const HrView: React.FC<HrViewProps> = ({
         const res = await fetch("/api/employees?role=hod");
         if (res.ok) {
           const data = await res.json();
-          setHods(data.employees || []);
+          setHodsList(data.employees || []);
         }
       } catch (e) {
         /* ignore */
@@ -85,11 +87,38 @@ export const HrView: React.FC<HrViewProps> = ({
 
   const setStage = (stage: string) => commit({ ...cycle, stage });
 
-  const setJudge = (id: string, name: string) =>
+  const setJudge = async (slotId: string, empCode: string) => {
+    const selectedEmp = hodsList.find((e) => e.code === empCode);
+    const judgeName = selectedEmp
+      ? `${selectedEmp.name} (${unitById(selectedEmp.unitId)?.name || selectedEmp.unitId})`
+      : "";
+
+    const updatedJudges = cycle.judges.map((j) =>
+      j.id === slotId ? { ...j, name: judgeName, code: empCode } : j
+    );
+
+    // Commit updated cycle
     commit({
       ...cycle,
-      judges: cycle.judges.map((j) => (j.id === id ? { ...j, name } : j)),
+      judges: updatedJudges,
     });
+
+    // Sync isPanelJudge boolean field to MongoDB employees collection (Max 3 HODs)
+    const activeJudgeCodes = updatedJudges
+      .map((j) => j.code)
+      .filter((c): c is string => Boolean(c))
+      .slice(0, 3); // Enforce max 3
+
+    try {
+      await fetch("/api/employees/panel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ judgeCodes: activeJudgeCodes }),
+      });
+    } catch (e) {
+      /* sync failed */
+    }
+  };
 
   const validate = (id: string, ok: boolean) =>
     commit({
@@ -175,12 +204,12 @@ export const HrView: React.FC<HrViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Cycle control */}
+      {/* Admin Cycle & Panel Scoring Control */}
       <Card className="p-5">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <Label>Cycle stage</Label>
-            <div className="flex flex-wrap gap-1.5">
+            <Label>Cycle Stage &amp; Admin Permission Control</Label>
+            <div className="mt-1 flex flex-wrap gap-1.5">
               {STAGES.map((s) => (
                 <button
                   key={s.id}
@@ -197,7 +226,25 @@ export const HrView: React.FC<HrViewProps> = ({
               ))}
             </div>
           </div>
-          <div className="ml-auto flex flex-wrap items-end gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Dedicated Admin Panel Score Open/Close Button */}
+            {cycle.stage === "judging" ? (
+              <Button
+                tone="danger"
+                onClick={() => setStage("validation")}
+              >
+                Close Panel Scoring Page
+              </Button>
+            ) : (
+              <Button
+                tone="solid"
+                disabled={cycle.stage === "announced"}
+                onClick={() => setStage("judging")}
+              >
+                Open Panel Scoring Page
+              </Button>
+            )}
+
             <Button tone="quiet" onClick={exportCsv}>
               <Download size={13} /> Export CSV
             </Button>
@@ -205,9 +252,25 @@ export const HrView: React.FC<HrViewProps> = ({
               onClick={announce}
               disabled={cycle.stage === "announced" || pool.length === 0}
             >
-              Declare winners <ChevronRight size={13} />
+              Declare Winners (Admin Permission Required) <ChevronRight size={13} />
             </Button>
           </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded bg-blue-900/5 p-3 text-xs text-blue-900/80">
+          <span className="font-semibold text-blue-950">Admin Permission Status:</span>
+          <span>
+            Panel Scoring Page is{" "}
+            <strong className={cycle.stage === "judging" ? "text-emerald-700" : "text-amber-800"}>
+              {cycle.stage === "judging" ? "OPEN" : "CLOSED"}
+            </strong>.
+          </span>
+          <span>
+            Results Declaration is{" "}
+            <strong className={cycle.stage === "announced" ? "text-emerald-700" : "text-blue-900"}>
+              {cycle.stage === "announced" ? "DECLARED & PUBLISHED" : "PENDING ADMIN APPROVAL"}
+            </strong>.
+          </span>
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-4">
           {[
@@ -259,27 +322,32 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </Card>
 
-      {/* Panel (HOD Selection Only) */}
+      {/* Panel Judge Assignment (HODs Only, Max 3 Allowed) */}
       <Card className="p-5">
-        <h3 className="text-sm font-semibold tracking-tight">
-          Judging panel for {monthLabel}
-        </h3>
-        <p className="mt-1 text-xs text-blue-900/60">
-          Only HODs can be assigned to the judging panel. Three HOD judges, assigned every month to keep scoring neutral.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight">
+              HOD Judging Panel Selection for {monthLabel}
+            </h3>
+            <p className="mt-1 text-xs text-blue-900/60">
+              Only registered HODs can be assigned to the judging panel (Max 3 HOD judges). Selected HODs gain Panel Scoring access (`isPanelJudge: true` in DB).
+            </p>
+          </div>
+          <Pill tone="good">Max 3 HOD Judges Allowed</Pill>
+        </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {cycle.judges.map((j, i) => (
-            <Field key={j.id} label={`Judge ${i + 1} (HOD Only)`}>
+            <Field key={j.id} label={`HOD Judge ${i + 1} Slot`}>
               <select
                 className={inputCls}
-                value={j.name}
+                value={j.code || ""}
                 onChange={(e) => setJudge(j.id, e.target.value)}
               >
                 <option value="">Select Registered HOD</option>
-                {hods.map((h) => {
-                  const labelName = `${h.name} (${unitById(h.unitId)?.name || h.unitId})`;
+                {hodsList.map((h) => {
+                  const labelName = `${h.name} — ${h.code} (${unitById(h.unitId)?.name || h.unitId})`;
                   return (
-                    <option key={h.code} value={labelName}>
+                    <option key={h.code} value={h.code}>
                       {labelName}
                     </option>
                   );

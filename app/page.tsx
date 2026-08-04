@@ -13,6 +13,7 @@ import {
   LogOut,
   UserCheck,
   Lock,
+  Award,
 } from "lucide-react";
 import { UNITS, STAGES, PRIZE, POINTS } from "../lib/constants";
 import { emptyCycle } from "../lib/helpers";
@@ -24,6 +25,9 @@ import NominateView from "../views/NominateView";
 import HodView from "../views/HodView";
 import JudgeView from "../views/JudgeView";
 import HrView from "../views/HrView";
+import ResultsView from "../views/ResultsView";
+
+export type TabId = Role | "results";
 
 export default function RRAdmin() {
   const router = useRouter();
@@ -37,7 +41,7 @@ export default function RRAdmin() {
   const [brand, setBrand] = useState<Branding>({ logoUrl: "" });
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [role, setRole] = useState<Role>("employee");
+  const [role, setRole] = useState<TabId>("employee");
   const [asUnit, setAsUnit] = useState(UNITS[0].id);
   const [asJudge, setAsJudge] = useState("j1");
 
@@ -48,14 +52,13 @@ export default function RRAdmin() {
       if (session.authenticated && session.user) {
         setCurrentUser(session.user);
         const userRole = session.user.role;
+        const isJudge = Boolean(session.user.isPanelJudge);
 
-        // Default tab based on role
-        if (userRole === "judge") {
-          setRole("judge");
+        // Default tab based on role & judge status
+        if (userRole === "hr") {
+          setRole("hr");
         } else if (userRole === "hod") {
           setRole("hod");
-        } else if (userRole === "hr") {
-          setRole("hr");
         } else {
           setRole("employee");
         }
@@ -114,23 +117,31 @@ export default function RRAdmin() {
   );
 
   // All potential tabs
-  const allTabs: Array<{ id: Role; label: string; icon: React.ComponentType<{ size?: number }> }> = [
-    { id: "employee", label: "Nominate", icon: ClipboardList },
-    { id: "hod", label: "HOD endorsement", icon: ShieldCheck },
+  const allTabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number }> }> = [
+    { id: "employee", label: "Self nomination", icon: ClipboardList },
+    { id: "hod", label: "HOD endorsement (2 Push)", icon: ShieldCheck },
     { id: "judge", label: "Panel scoring", icon: Scale },
+    { id: "results", label: "Results", icon: Award },
     { id: "hr", label: "HR console", icon: Trophy },
   ];
 
-  // Filter permitted tabs based on user role (RBAC)
-  const allowedRoles: Role[] = currentUser
+  // Filter permitted tabs based on user role & isPanelJudge DB boolean (RBAC)
+  // Panel scoring tab ("judge") is ONLY visible to users with isPanelJudge === true in DB
+  const isPanelJudge = Boolean(currentUser?.isPanelJudge);
+
+  const allowedRoles: TabId[] = currentUser
     ? currentUser.role === "hr"
-      ? ["employee", "hod", "judge", "hr"]
+      ? isPanelJudge
+        ? ["employee", "hod", "judge", "results", "hr"]
+        : ["employee", "hod", "results", "hr"]
       : currentUser.role === "hod"
-        ? ["employee", "hod"]
-        : currentUser.role === "judge"
-          ? ["judge"]
-          : ["employee"]
-    : ["employee"];
+        ? isPanelJudge
+          ? ["hod", "judge", "results"]
+          : ["hod", "results"]
+        : isPanelJudge
+          ? ["employee", "judge", "results"]
+          : ["employee", "results"]
+    : ["employee", "results"];
 
   const visibleTabs = allTabs.filter((t) => allowedRoles.includes(t.id));
 
@@ -266,7 +277,7 @@ export default function RRAdmin() {
             <div className="flex items-center gap-2">
               <select
                 value={asJudge}
-                disabled={currentUser?.role === "judge"} // Lock to Judge's assigned position
+                disabled={currentUser?.role === "judge" || currentUser?.isPanelJudge} // Lock to Judge's assigned position
                 onChange={(e) => setAsJudge(e.target.value)}
                 className="rounded border border-blue-900/15 px-2.5 py-1.5 text-xs font-medium text-blue-950 disabled:bg-blue-900/5"
               >
@@ -276,7 +287,7 @@ export default function RRAdmin() {
                   </option>
                 ))}
               </select>
-              {currentUser?.role === "judge" && (
+              {(currentUser?.role === "judge" || currentUser?.isPanelJudge) && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-900/50" title="Assigned Judge Slot Locked">
                   <Lock size={12} /> Assigned Slot
                 </span>
@@ -304,7 +315,12 @@ export default function RRAdmin() {
         ) : (
           <>
             {activeRole === "employee" && (
-              <NominateView cycle={cycle} commit={commit} locked={locked} />
+              <NominateView
+                cycle={cycle}
+                commit={commit}
+                currentUser={currentUser}
+                locked={locked}
+              />
             )}
             {activeRole === "hod" && (
               <HodView
@@ -321,6 +337,9 @@ export default function RRAdmin() {
                 judgeId={asJudge}
                 locked={locked}
               />
+            )}
+            {activeRole === "results" && (
+              <ResultsView cycle={cycle} />
             )}
             {activeRole === "hr" && (
               <HrView

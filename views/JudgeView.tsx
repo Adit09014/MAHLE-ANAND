@@ -35,23 +35,33 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
       <Card className="p-5">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div>
-            <Label>Scoring as</Label>
+            <Label>Scoring as Panel Judge</Label>
             <p className="text-base font-semibold tracking-tight">
-              {judge?.name || "Unnamed judge — HR to fill this in"}
+              {judge?.name || "Unnamed Panel Judge"}
             </p>
           </div>
-          <p className="ml-auto max-w-md text-xs leading-relaxed text-blue-900/60">
-            One score, 0–10, per nominee. 9–10 exceptional evidence with
-            measurable impact · 7–8 strong with minor gaps · 4–6 moderate, limited
-            specificity · 0–3 vague or unevidenced.
-          </p>
+          <div className="ml-auto flex items-center gap-2">
+            {open ? (
+              <Pill tone="good">Scoring Window OPEN (Controlled by Admin)</Pill>
+            ) : (
+              <Pill tone="warn">Scoring Window CLOSED by Admin</Pill>
+            )}
+          </div>
         </div>
+        <p className="mt-3 text-xs leading-relaxed text-blue-900/60">
+          Enter a score from 0–10 per nominee. <strong>Confidentiality Note:</strong> Overall panel average scores and full results are strictly restricted to Admin visibility.
+        </p>
       </Card>
 
-      {!open && (
-        <div className="flex items-center gap-2 rounded border border-blue-900/15 bg-white px-3 py-2 text-xs">
-          <Lock size={13} /> Scoring is open only during the judging window
-          (10th–12th). HR moves the cycle there.
+      {!open ? (
+        <div className="flex items-center gap-2 rounded border border-amber-500/40 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 font-medium">
+          <Lock size={14} className="shrink-0" />
+          <span>Panel scoring is currently CLOSED by Admin. Input fields are disabled until Admin opens the Panel Scoring page.</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded border border-emerald-500/40 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 font-medium">
+          <Pill tone="good">Active</Pill>
+          <span>Panel scoring window is OPEN by Admin permission. Enter your scores below.</span>
         </div>
       )}
 
