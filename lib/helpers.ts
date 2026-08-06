@@ -88,9 +88,7 @@ export function emptyCycle(month: string): Cycle {
 
 export function panelScore(cycle: Cycle, nomId: string): PanelScoreResult {
   const s = cycle.scores[nomId] || {};
-  const vals = cycle.judges
-    .map((j) => s[j.id])
-    .filter((v): v is number => typeof v === "number");
+  const vals = Object.values(s).filter((v): v is number => typeof v === "number");
   if (!vals.length) return { avg: null, count: 0, vals };
   return {
     avg: vals.reduce((a, b) => a + b, 0) / vals.length,

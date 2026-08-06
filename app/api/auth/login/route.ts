@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       if (found) {
         assignedJudgeSlot = found.id;
       } else {
-        assignedJudgeSlot = "j1";
+        assignedJudgeSlot = empCode;
       }
     }
 

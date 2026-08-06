@@ -19,6 +19,11 @@ import {
   AlertTriangle,
   Sparkles,
   Trophy,
+  ClipboardList,
+  ShieldCheck,
+  Scale,
+  Sliders,
+  Image as ImageIcon,
 } from "lucide-react";
 import { STAGES, PANEL_SIZE, POINTS, UNITS, catById, unitById } from "../lib/constants";
 import {
@@ -37,13 +42,12 @@ import Label from "../components/Label";
 import Button from "../components/Button";
 import Pill from "../components/Pill";
 import BrandMark from "../components/BrandMark";
-import Empty from "../components/Empty";
 
 const inputCls =
-  "w-full rounded border border-blue-900/15 bg-white px-3 py-2 text-sm text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20";
+  "w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 shadow-xs";
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <label className="block">
+  <label className="block space-y-1">
     <Label>{label}</Label>
     {children}
   </label>
@@ -238,23 +242,20 @@ export const HrView: React.FC<HrViewProps> = ({
     setEditStatusMsg(null);
   };
 
-  // Step 1: Triggered when HR Admin clicks "Save Details"
   const handleSaveEmpEditClick = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEmp) return;
     setEditStatusMsg(null);
-    setShowConfirmPrompt(true); // Show Yes/No modal
+    setShowConfirmPrompt(true);
   };
 
-  // Step 2: Triggered when HR Admin clicks "Yes, Continue"
   const handleProceedToPasswordAuth = () => {
     setShowConfirmPrompt(false);
-    setShowAdminAuthPrompt(true); // Show Admin Password modal
+    setShowAdminAuthPrompt(true);
     setAdminPasswordInput("");
     setAdminAuthError(null);
   };
 
-  // Step 3: Triggered when HR Admin submits password in Admin Password modal
   const executeEmpEditWithAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEmp || !adminPasswordInput.trim()) {
@@ -352,21 +353,18 @@ export const HrView: React.FC<HrViewProps> = ({
   const [deleteAdminAuthError, setDeleteAdminAuthError] = useState<string | null>(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
 
-  // Step 1: Triggered when HR Admin clicks Trash button on employee row
   const handleDeleteEmpClick = (emp: EmployeeRecord) => {
     setDeletingEmpTarget(emp);
-    setShowDeleteConfirmPrompt(true); // Show Yes/No modal for delete
+    setShowDeleteConfirmPrompt(true);
   };
 
-  // Step 2: Triggered when HR Admin clicks "Yes, Continue" in Delete modal
   const handleProceedToDeletePasswordAuth = () => {
     setShowDeleteConfirmPrompt(false);
-    setShowDeleteAdminAuthPrompt(true); // Show Admin Password modal for delete
+    setShowDeleteAdminAuthPrompt(true);
     setDeleteAdminPasswordInput("");
     setDeleteAdminAuthError(null);
   };
 
-  // Step 3: Triggered when HR Admin submits password in Delete Admin Password modal
   const executeEmpDeleteWithAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deletingEmpTarget || !deleteAdminPasswordInput.trim()) {
@@ -463,11 +461,11 @@ export const HrView: React.FC<HrViewProps> = ({
   const extendPhaseByDays = (phaseKey: keyof CycleTimeline, days: number) => {
     const currentTimeline = getCycleTimeline(cycle);
     const currentPhase = currentTimeline[phaseKey];
-    const baseEnd = currentPhase.extendedUntil || currentPhase.endDate;
-    const newEnd = addDaysToDateStr(baseEnd, days);
+    const baseEnd = getEffectiveEndDate(currentPhase);
+    const nextEnd = addDaysToDateStr(baseEnd, days);
     updatePhaseTimeline(phaseKey, {
       isExtended: true,
-      extendedUntil: newEnd,
+      extendedUntil: nextEnd,
     });
   };
 
@@ -478,51 +476,35 @@ export const HrView: React.FC<HrViewProps> = ({
     });
   };
 
-  const setStage = (stage: string) => commit({ ...cycle, stage });
-
   const setJudge = async (slotId: string, empCode: string) => {
-    const selectedEmp = hodsList.find((e) => e.code === empCode);
-    const judgeName = selectedEmp
-      ? `${selectedEmp.name} (${unitById(selectedEmp.unitId)?.name || selectedEmp.unitId})`
-      : "";
-
-    const updatedJudges = cycle.judges.map((j) =>
-      j.id === slotId ? { ...j, name: judgeName, code: empCode } : j
-    );
-
-    // Commit updated cycle
-    commit({
-      ...cycle,
-      judges: updatedJudges,
+    const nextJudges = cycle.judges.map((j) => {
+      if (j.id !== slotId) return j;
+      const matchHod = hodsList.find((h) => h.code === empCode);
+      return {
+        ...j,
+        code: empCode,
+        name: matchHod ? matchHod.name : "",
+      };
     });
 
-    // Sync isPanelJudge boolean field to MongoDB employees collection (Max 3 HODs)
-    const activeJudgeCodes = updatedJudges
-      .map((j) => j.code)
-      .filter((c): c is string => Boolean(c))
-      .slice(0, 3); // Enforce max 3
+    commit({
+      ...cycle,
+      judges: nextJudges,
+    });
 
     try {
       await fetch("/api/employees/panel", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ judgeCodes: activeJudgeCodes }),
+        body: JSON.stringify({ judges: nextJudges }),
       });
+      fetchEmployees();
     } catch (e) {
-      /* sync failed */
+      /* ignore */
     }
   };
 
-  const validate = (id: string, ok: boolean) =>
-    commit({
-      ...cycle,
-      nominations: cycle.nominations.map((n) =>
-        n.id === id ? { ...n, validated: ok } : n
-      ),
-    });
-
   const announce = async () => {
-    // Winner is top-ranked nominee with at least 1 valid judge score (w.count > 0)
     const winners = res
       .map((r) => r.ranked[0])
       .filter((w) => w && w.nom && w.avg !== null && w.count > 0);
@@ -535,7 +517,6 @@ export const HrView: React.FC<HrViewProps> = ({
         points: 0,
         wins: [],
       };
-      // Prevent duplicate logging for the same month and category
       const winExists = next[k].wins.some(
         (win) => win.month === cycle.month && win.category === w.nom.category
       );
@@ -548,7 +529,7 @@ export const HrView: React.FC<HrViewProps> = ({
     try {
       await savePoints(next);
     } catch (e) {
-      /* surfaced by the cycle write below if storage is down */
+      /* ignore */
     }
     commit({
       ...cycle,
@@ -686,106 +667,149 @@ export const HrView: React.FC<HrViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Admin Cycle & Panel Scoring Control */}
-      <Card className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* 1. Header Banner */}
+      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2.5 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+              <Sparkles size={13} className="text-sky-300" />
+              <span>MAHLE ANAND HR Admin Console</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              HR Recognition Management &amp; System Controls
+            </h1>
+            <p className="text-sm text-sky-100/80 leading-relaxed">
+              Control active cycle stages, extend nomination deadlines, assign panel judges, declare monthly winners, and manage employee directory accounts.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              onClick={exportCsv}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 active:scale-95 transition-all"
+            >
+              <Download size={15} /> Export Cycle CSV
+            </button>
+            <button
+              onClick={exportAnnualLedgerCsv}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 text-amber-950 px-4 py-2.5 text-xs font-bold uppercase tracking-wider shadow-md hover:bg-amber-300 active:scale-95 transition-all"
+            >
+              <Trophy size={15} /> Export LSIP Ledger
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Admin Stage Controls & Metric Summary Cards */}
+      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-900/10 pb-5">
           <div>
-            <Label>Cycle Stage &amp; Admin Permission Control</Label>
-            <div className="mt-1 flex flex-wrap gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-900/60 block mb-1">
+              Cycle Stage Management ({monthLabel})
+            </span>
+            <div className="flex flex-wrap gap-2">
               {STAGES.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => handleStageChangeClick(s.id)}
                   disabled={s.id === "announced"}
-                  className={`rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-wider transition-all duration-150 active:scale-95 ${
-                    cycle.stage === s.id
-                      ? "bg-blue-800 text-white shadow-md shadow-blue-900/20"
+                  className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all duration-150 active:scale-95 ${cycle.stage === s.id
+                      ? "bg-[#0A2540] text-white shadow-md shadow-blue-900/20 ring-2 ring-sky-400"
                       : "border border-blue-900/15 bg-white text-blue-900/70 hover:border-blue-700 hover:bg-blue-50/50 disabled:opacity-40"
-                  }`}
+                    }`}
                 >
                   {s.label}
                 </button>
               ))}
             </div>
           </div>
+
           <div className="flex flex-wrap items-center gap-3">
-            {/* Dedicated Admin Panel Score Open/Close Button */}
             {cycle.stage === "judging" ? (
-              <Button
-                tone="danger"
+              <button
                 onClick={() => handleStageChangeClick("validation")}
+                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-rose-700 active:scale-95 transition"
               >
-                Close Panel Scoring Page
-              </Button>
+                <Scale size={15} /> Close Panel Scoring Page
+              </button>
             ) : (
-              <Button
-                tone="solid"
+              <button
                 disabled={cycle.stage === "announced"}
                 onClick={() => handleStageChangeClick("judging")}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-emerald-700 disabled:opacity-50 active:scale-95 transition"
               >
-                Open Panel Scoring Page
-              </Button>
+                <Scale size={15} /> Open Panel Scoring Page
+              </button>
             )}
 
-            <Button tone="quiet" onClick={exportCsv}>
-              <Download size={13} /> Export CSV
-            </Button>
-            <Button
+            <button
               onClick={handleAnnounceClick}
               disabled={cycle.stage === "announced" || pool.length === 0}
+              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-amber-950 shadow-md hover:bg-amber-400 disabled:opacity-50 active:scale-95 transition"
             >
-              Declare Winners (Admin Permission Required) <ChevronRight size={13} />
-            </Button>
+              <Trophy size={15} /> Declare Winners <ChevronRight size={14} />
+            </button>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded bg-blue-900/5 p-3 text-xs text-blue-900/80">
-          <span className="font-semibold text-blue-950">Admin Permission Status:</span>
-          <span>
-            Panel Scoring Page is{" "}
-            <strong className={cycle.stage === "judging" ? "text-emerald-700" : "text-amber-800"}>
-              {cycle.stage === "judging" ? "OPEN" : "CLOSED"}
-            </strong>.
-          </span>
-          <span>
-            Results Declaration is{" "}
-            <strong className={cycle.stage === "announced" ? "text-emerald-700" : "text-blue-900"}>
-              {cycle.stage === "announced" ? "DECLARED & PUBLISHED" : "PENDING ADMIN APPROVAL"}
-            </strong>.
-          </span>
-        </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-4">
-          {[
-            ["Nominations", cycle.nominations.length],
-            ["Endorsed", pool.length],
-            ["Awaiting validation", pending],
-            [
-              "Scores in",
-              pool.reduce((a, n) => a + panelScore(cycle, n.id).count, 0) +
-                "/" +
-                pool.length * PANEL_SIZE,
-            ],
-          ].map(([k, v]) => (
-            <div key={k as string} className="rounded bg-blue-900/5 px-3 py-2.5">
-              <Label>{k as string}</Label>
-              <p className="font-mono text-xl tabular-nums">{v}</p>
+        {/* 4 Summary Metric Cards */}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-1">
+            <div className="flex items-center justify-between text-indigo-900/70">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Total Applied</span>
+              <ClipboardList size={18} className="text-indigo-600" />
             </div>
-          ))}
+            <p className="text-2xl font-black text-blue-950">{cycle.nominations.length}</p>
+            <span className="text-[11px] text-indigo-700 font-medium">Applied Nominations</span>
+          </div>
+
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-1">
+            <div className="flex items-center justify-between text-emerald-900/70">
+              <span className="text-[11px] font-bold uppercase tracking-wider">HOD Endorsed</span>
+              <ShieldCheck size={18} className="text-emerald-600" />
+            </div>
+            <p className="text-2xl font-black text-blue-950">{pool.length}</p>
+            <span className="text-[11px] text-emerald-700 font-medium">Endorsed Candidates</span>
+          </div>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-1">
+            <div className="flex items-center justify-between text-amber-900/70">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Pending HR Review</span>
+              <Clock size={18} className="text-amber-600" />
+            </div>
+            <p className="text-2xl font-black text-blue-950">{pending}</p>
+            <span className="text-[11px] text-amber-700 font-medium">Awaiting Validation</span>
+          </div>
+
+          <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 space-y-1">
+            <div className="flex items-center justify-between text-sky-900/70">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Panel Scores</span>
+              <Scale size={18} className="text-sky-600" />
+            </div>
+            <p className="text-2xl font-black text-blue-950">
+              {pool.reduce((a, n) => a + panelScore(cycle, n.id).count, 0)}
+              <span className="text-sm text-slate-400 font-semibold"> / {pool.length * PANEL_SIZE}</span>
+            </p>
+            <span className="text-[11px] text-sky-700 font-medium">Panel Votes Submitted</span>
+          </div>
         </div>
       </Card>
 
-      {/* Admin Timeline & Date Extension Management */}
-      <Card className="p-5">
+      {/* 3. Admin Timeline & Date Extension Management */}
+      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-900/10 pb-4">
           <div>
             <div className="flex items-center gap-2">
               <Calendar size={18} className="text-blue-700" />
-              <h3 className="text-sm font-semibold tracking-tight">
+              <h3 className="text-base font-bold text-blue-950">
                 Timeline &amp; Date Extension Controls for {monthLabel}
               </h3>
             </div>
             <p className="mt-1 text-xs text-blue-900/60">
-              Decide start and end dates for form filling, HOD endorsements, and panel scoring. Extend deadlines anytime.
+              Set start and end dates for self-nomination, HOD endorsements, and panel scoring. Extend deadlines anytime.
             </p>
           </div>
           <Pill tone="good">Admin Access Enabled</Pill>
@@ -796,13 +820,13 @@ export const HrView: React.FC<HrViewProps> = ({
             [
               {
                 key: "nomination",
-                title: "1. Form Filling Timeline (Self-Nomination)",
+                title: "1. Self-Nomination Timeline",
                 desc: "Window for employees to submit self-nominations.",
                 phase: timeline.nomination,
               },
               {
                 key: "hodEndorsement",
-                title: "2. HOD Approval & Pushing Timeline",
+                title: "2. HOD Endorsement Timeline",
                 desc: "Window for HODs to endorse candidates for their department.",
                 phase: timeline.hodEndorsement,
               },
@@ -818,32 +842,31 @@ export const HrView: React.FC<HrViewProps> = ({
             return (
               <div
                 key={key}
-                className={`rounded border p-4 transition ${
-                  phase.isExtended
-                    ? "border-amber-400/80 bg-amber-50/60 shadow-sm"
-                    : "border-blue-900/15 bg-white"
-                }`}
+                className={`rounded-2xl border p-5 transition ${phase.isExtended
+                    ? "border-amber-400/80 bg-amber-50/60 shadow-xs"
+                    : "border-blue-900/10 bg-slate-50/40"
+                  }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h4 className="text-xs font-semibold text-blue-950 uppercase tracking-wider flex items-center gap-2">
+                    <h4 className="text-xs font-extrabold text-blue-950 uppercase tracking-wider flex items-center gap-2">
                       {title}
                       {phase.isExtended && (
-                        <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
                           <Clock size={11} /> EXTENDED
                         </span>
                       )}
                     </h4>
-                    <p className="mt-0.5 text-xs text-blue-900/60">{desc}</p>
+                    <p className="mt-1 text-xs text-blue-900/60">{desc}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-mono text-xs font-semibold text-blue-950">
+                    <p className="font-mono text-xs font-bold text-blue-950 bg-white px-3 py-1 rounded-lg border border-blue-900/10">
                       Active: {formatDatePretty(phase.startDate)} – {formatDatePretty(effectiveEnd)}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="mt-4 flex flex-wrap items-end gap-3 pt-3 border-t border-blue-900/5">
                   <div className="w-36">
                     <Label>Start Date</Label>
                     <input
@@ -865,42 +888,43 @@ export const HrView: React.FC<HrViewProps> = ({
                           extendedUntil: e.target.value,
                         })
                       }
-                      className={`${inputCls} ${phase.isExtended ? "border-amber-500 font-semibold text-amber-950" : ""}`}
+                      className={`${inputCls} ${phase.isExtended ? "border-amber-500 font-semibold text-amber-950 bg-amber-50" : ""}`}
                     />
                   </div>
 
+                  {/* Date Extension Buttons (DUPLICATE PLUS SIGN FIXED) */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold text-blue-900/60 mr-1">Extend:</span>
+                    <span className="text-xs font-semibold text-blue-900/60 mr-1">Extend Deadline:</span>
                     <button
                       type="button"
                       onClick={() => extendPhaseByDays(key, 1)}
-                      className="inline-flex items-center gap-1 rounded border border-blue-900/20 bg-blue-900/5 px-2.5 py-1.5 text-xs font-medium text-blue-950 hover:bg-blue-800 hover:text-white transition"
+                      className="inline-flex items-center gap-1 rounded-xl border border-blue-900/20 bg-white px-3 py-2 text-xs font-bold text-blue-950 hover:bg-blue-800 hover:text-white transition shadow-2xs active:scale-95"
                     >
-                      <Plus size={11} /> +1 Day
+                      <Plus size={12} /> 1 Day
                     </button>
                     <button
                       type="button"
                       onClick={() => extendPhaseByDays(key, 3)}
-                      className="inline-flex items-center gap-1 rounded border border-blue-900/20 bg-blue-900/5 px-2.5 py-1.5 text-xs font-medium text-blue-950 hover:bg-blue-800 hover:text-white transition"
+                      className="inline-flex items-center gap-1 rounded-xl border border-blue-900/20 bg-white px-3 py-2 text-xs font-bold text-blue-950 hover:bg-blue-800 hover:text-white transition shadow-2xs active:scale-95"
                     >
-                      <Plus size={11} /> +3 Days
+                      <Plus size={12} /> 3 Days
                     </button>
                     <button
                       type="button"
                       onClick={() => extendPhaseByDays(key, 7)}
-                      className="inline-flex items-center gap-1 rounded border border-blue-900/20 bg-blue-900/5 px-2.5 py-1.5 text-xs font-medium text-blue-950 hover:bg-blue-800 hover:text-white transition"
+                      className="inline-flex items-center gap-1 rounded-xl border border-blue-900/20 bg-white px-3 py-2 text-xs font-bold text-blue-950 hover:bg-blue-800 hover:text-white transition shadow-2xs active:scale-95"
                     >
-                      <Plus size={11} /> +7 Days
+                      <Plus size={12} /> 7 Days
                     </button>
 
                     {phase.isExtended && (
                       <button
                         type="button"
                         onClick={() => resetPhaseExtension(key)}
-                        className="inline-flex items-center gap-1 rounded border border-amber-600/40 bg-amber-100 px-2.5 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-200 transition"
+                        className="inline-flex items-center gap-1 rounded-xl border border-amber-600/40 bg-amber-100 px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200 transition shadow-2xs active:scale-95"
                         title="Reset extension to standard end date"
                       >
-                        <RotateCcw size={11} /> Reset
+                        <RotateCcw size={12} /> Reset Extension
                       </button>
                     )}
                   </div>
@@ -911,24 +935,23 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </Card>
 
-
-
-      {/* Panel Judge Assignment (HODs Only, Max 3 Allowed) */}
-      <Card className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* 4. Panel Judge Selection (HODs Only, Max 3 Allowed) */}
+      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-900/10 pb-4">
           <div>
-            <h3 className="text-sm font-semibold tracking-tight">
+            <h3 className="text-base font-bold text-blue-950 flex items-center gap-2">
+              <Scale size={18} className="text-emerald-600" />
               HOD Judging Panel Selection for {monthLabel}
             </h3>
             <p className="mt-1 text-xs text-blue-900/60">
-              Only registered HODs can be assigned to the judging panel (Max 3 HOD judges). Selected HODs gain Panel Scoring access (`isPanelJudge: true` in DB).
+              Select 3 registered HODs to serve on the monthly Panel Scoring Committee. Appointed judges gain access to the Panel Scoring page.
             </p>
           </div>
           <Pill tone="good">Max 3 HOD Judges Allowed</Pill>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
           {cycle.judges.map((j, i) => (
-            <Field key={j.id} label={`HOD Judge ${i + 1} Slot`}>
+            <Field key={j.id} label={`HOD Judge ${i + 1} Appointment`}>
               <select
                 className={inputCls}
                 value={j.code || ""}
@@ -949,49 +972,57 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </Card>
 
-
-
-      {/* Standings */}
+      {/* 5. Live Standings & Results Preview */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold tracking-tight">
-          {cycle.stage === "announced" ? "Winners" : "Live standings"}
+        <h3 className="mb-3 text-base font-bold tracking-tight text-blue-950 flex items-center gap-2">
+          <Trophy size={18} className="text-amber-500" />
+          {cycle.stage === "announced" ? "Official Announced Winners" : "Live Candidate Standings"}
         </h3>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           {res.map((r) => (
-            <Card key={r.category.id + (r.slotLabel || "")} className="p-4">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-semibold">{r.category.name}</h4>
-                {r.slotLabel && <Pill>{r.slotLabel}</Pill>}
+            <Card key={r.category.id + (r.slotLabel || "")} className="p-5 border border-blue-900/10 bg-white">
+              <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-extrabold text-blue-950">{r.category.name}</h4>
+                  {r.slotLabel && <Pill>{r.slotLabel}</Pill>}
+                </div>
+                <span className="text-[10px] font-bold uppercase text-slate-400">
+                  {r.ranked.length} Candidate(s)
+                </span>
               </div>
               {r.ranked.length === 0 ? (
-                <p className="mt-3 text-xs text-blue-900/50">
-                  No endorsed nominee.
+                <p className="mt-4 text-xs text-blue-900/50 italic py-4 text-center">
+                  No endorsed nominees in this category yet.
                 </p>
               ) : (
-                <ul className="mt-3 space-y-1.5">
+                <ul className="mt-3 space-y-2">
                   {r.ranked.map((x, i) => (
                     <li
                       key={x.nom.id}
-                      className="flex items-center gap-3 border-t border-blue-900/10 pt-1.5 first:border-0 first:pt-0"
+                      className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition"
                     >
-                      <span className="font-mono text-xs text-blue-900/35">
-                        {i + 1}
-                      </span>
-                      <span className="flex-1 text-sm">
-                        {x.nom.name}
-                        <span className="ml-2 text-xs text-blue-900/50">
-                          {unitById(x.nom.unit)?.name}
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-900/10 text-xs font-bold text-blue-950">
+                          #{i + 1}
                         </span>
-                      </span>
-                      {i === 0 && x.avg !== null && cycle.stage === "announced" && (
-                        <Pill tone="gold">Winner</Pill>
-                      )}
-                      <span className="font-mono text-sm tabular-nums">
-                        {x.avg === null ? "—" : x.avg.toFixed(2)}
-                      </span>
-                      <span className="font-mono text-xs text-blue-900/40">
-                        {x.count}/{PANEL_SIZE}
-                      </span>
+                        <div>
+                          <strong className="block text-xs font-bold text-blue-950">{x.nom.name}</strong>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {unitById(x.nom.unit)?.name} ({x.nom.code})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {i === 0 && x.avg !== null && cycle.stage === "announced" && (
+                          <Pill tone="gold">Winner</Pill>
+                        )}
+                        <span className="font-mono text-xs font-extrabold text-blue-950">
+                          {x.avg === null ? "—" : x.avg.toFixed(2)} Pts
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-400">
+                          ({x.count}/{PANEL_SIZE})
+                        </span>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -1001,22 +1032,22 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </div>
 
-      {/* Annual R&R Ledger & Year-End LSIP Weightage Tracker */}
-      <Card className="p-5">
+      {/* 6. Annual R&R Ledger & Year-End LSIP Weightage Tracker */}
+      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-900/10 pb-4">
           <div>
             <h3 className="text-base font-bold tracking-tight text-blue-950 flex items-center gap-2">
               <Trophy className="text-amber-500" size={18} /> Annual R&amp;R Ledger &amp; Year-End LSIP Weightage Tracker
             </h3>
             <p className="text-xs text-blue-900/70 mt-1">
-              Monthly winners receive <strong>10 points</strong> recorded in this HR ledger. Monthly awards carry a <strong>50% weightage</strong> in the year-end LSIP awards.
+              Monthly winners receive <strong>10 points</strong> recorded in this HR ledger. Monthly awards carry a <strong>50% weightage</strong> in year-end LSIP awards.
             </p>
           </div>
           <div className="flex items-center gap-2">
             {cycle.stage === "announced" && (
               <button
                 onClick={syncLedgerFromCurrentCycle}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-200 transition shadow-sm active:scale-95"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-100 px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200 transition shadow-xs active:scale-95"
                 title="Sync winner(s) from current announced cycle into Annual Ledger"
               >
                 <RotateCcw size={13} /> Sync Winners
@@ -1024,7 +1055,7 @@ export const HrView: React.FC<HrViewProps> = ({
             )}
             <button
               onClick={exportAnnualLedgerCsv}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/20 bg-blue-900/5 px-3 py-1.5 text-xs font-semibold text-blue-950 hover:bg-blue-800 hover:text-white transition shadow-sm active:scale-95"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/20 bg-blue-900/5 px-3.5 py-2 text-xs font-bold text-blue-950 hover:bg-blue-800 hover:text-white transition shadow-xs active:scale-95"
               title="Export complete year-end LSIP ledger to CSV"
             >
               <Download size={13} /> Export LSIP Ledger (CSV)
@@ -1032,22 +1063,8 @@ export const HrView: React.FC<HrViewProps> = ({
           </div>
         </div>
 
-        {/* Business Policy Summary Banner */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300/60 bg-amber-50/70 p-3.5 text-xs text-amber-950">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-amber-600 shrink-0" />
-            <div>
-              <span className="font-bold">Year-End Conversion Rule:</span> Cumulative monthly points feed directly into the monthly component of Year-End R&amp;R (50% weightage).
-            </div>
-          </div>
-          <div className="flex items-center gap-3 font-mono font-bold text-[11px]">
-            <span className="rounded bg-amber-200/80 px-2 py-0.5 text-amber-900">1 Win = 10 Points</span>
-            <span className="rounded bg-amber-200/80 px-2 py-0.5 text-amber-900">Weightage = 50% LSIP</span>
-          </div>
-        </div>
-
         {/* Annual Points & LSIP Weightage Table */}
-        <div className="mt-4 overflow-x-auto rounded-xl border border-blue-900/10 bg-white">
+        <div className="mt-5 overflow-x-auto rounded-xl border border-blue-900/10 bg-white">
           <table className="w-full text-left text-xs">
             <thead className="border-b border-blue-900/10 bg-blue-900/5 text-[11px] font-bold uppercase tracking-wider text-blue-900/70">
               <tr>
@@ -1062,7 +1079,7 @@ export const HrView: React.FC<HrViewProps> = ({
               {Object.keys(points).length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-blue-900/50 italic">
-                    No points recorded in HR annual ledger yet. Points will accumulate as monthly winners are announced.
+                    No points recorded in HR annual ledger yet. Points accumulate as monthly winners are announced.
                   </td>
                 </tr>
               ) : (
@@ -1079,7 +1096,7 @@ export const HrView: React.FC<HrViewProps> = ({
                         {unitById(p.unit)?.name || p.unit}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-900">
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-900">
                           {winsCount} {winsCount === 1 ? "Win" : "Wins"}
                         </span>
                       </td>
@@ -1111,18 +1128,18 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </Card>
 
-      {/* Admin Employee Master Directory & Management */}
-      <Card className="p-5">
+      {/* 7. Employee Master Directory & Management */}
+      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-900/10 pb-4">
           <div>
-            <h3 className="text-sm font-semibold tracking-tight text-blue-950 flex items-center gap-2">
-              <User className="text-blue-800" size={16} /> Employee Master Directory &amp; Admin Access
+            <h3 className="text-base font-bold text-blue-950 flex items-center gap-2">
+              <User className="text-blue-800" size={18} /> Employee Master Directory &amp; Admin Access
             </h3>
             <p className="text-xs text-blue-900/60 mt-0.5">
               Manage employee details, department assignments, roles, panel judge access, and passwords.
             </p>
           </div>
-          <Button
+          <button
             onClick={() => {
               setShowAddModal(true);
               setAddCode("");
@@ -1133,14 +1150,14 @@ export const HrView: React.FC<HrViewProps> = ({
               setAddGender("");
               setAddMsg(null);
             }}
-            className="flex items-center gap-1.5"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0A2540] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition"
           >
-            <UserPlus size={14} /> Add New Employee
-          </Button>
+            <UserPlus size={15} /> Add New Employee
+          </button>
         </div>
 
         {/* Search & Filters */}
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-900/40" />
             <input
@@ -1148,7 +1165,7 @@ export const HrView: React.FC<HrViewProps> = ({
               placeholder="Search by Employee Code or Name..."
               value={empSearch}
               onChange={(e) => setEmpSearch(e.target.value)}
-              className="w-full rounded-xl border border-blue-900/15 bg-white pl-9 pr-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700 shadow-sm"
+              className="w-full rounded-xl border border-blue-900/15 bg-white pl-9 pr-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700 shadow-xs"
             />
           </div>
 
@@ -1156,7 +1173,7 @@ export const HrView: React.FC<HrViewProps> = ({
             <select
               value={empRoleFilter}
               onChange={(e) => setEmpRoleFilter(e.target.value)}
-              className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none shadow-sm"
+              className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none shadow-xs"
             >
               <option value="all">All Roles</option>
               <option value="employee">Employee</option>
@@ -1169,7 +1186,7 @@ export const HrView: React.FC<HrViewProps> = ({
             <select
               value={empUnitFilter}
               onChange={(e) => setEmpUnitFilter(e.target.value)}
-              className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none shadow-sm"
+              className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none shadow-xs"
             >
               <option value="all">All Departments/Units</option>
               {UNITS.map((u) => (
@@ -1184,14 +1201,14 @@ export const HrView: React.FC<HrViewProps> = ({
         {/* Employee Table */}
         <div className="mt-4 overflow-x-auto rounded-xl border border-blue-900/10">
           <table className="w-full text-xs">
-            <thead className="bg-blue-900/5 text-blue-900/70 font-semibold uppercase tracking-wider text-[11px]">
+            <thead className="bg-blue-900/5 text-blue-900/70 font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="px-4 py-2.5 text-left">Emp Code</th>
-                <th className="px-4 py-2.5 text-left">Employee Name</th>
-                <th className="px-4 py-2.5 text-left">Department / Unit</th>
-                <th className="px-4 py-2.5 text-left">Role</th>
-                <th className="px-4 py-2.5 text-left">Panel Judge</th>
-                <th className="px-4 py-2.5 text-right">Actions</th>
+                <th className="px-4 py-3 text-left">Emp Code</th>
+                <th className="px-4 py-3 text-left">Employee Name</th>
+                <th className="px-4 py-3 text-left">Department / Unit</th>
+                <th className="px-4 py-3 text-left">Role</th>
+                <th className="px-4 py-3 text-left">Panel Judge</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-blue-900/10 bg-white">
@@ -1210,44 +1227,43 @@ export const HrView: React.FC<HrViewProps> = ({
               ) : (
                 filteredEmployees.map((emp) => (
                   <tr key={emp.code} className="hover:bg-blue-50/40 transition">
-                    <td className="px-4 py-2.5 font-mono font-bold text-blue-950">{emp.code}</td>
-                    <td className="px-4 py-2.5 font-medium text-blue-950">{emp.name}</td>
-                    <td className="px-4 py-2.5 text-blue-900/80">{unitById(emp.unitId)?.name || emp.unitId}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-3 font-mono font-bold text-blue-950">{emp.code}</td>
+                    <td className="px-4 py-3 font-medium text-blue-950">{emp.name}</td>
+                    <td className="px-4 py-3 text-blue-900/80">{unitById(emp.unitId)?.name || emp.unitId}</td>
+                    <td className="px-4 py-3">
                       <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                          emp.role === "hr"
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${emp.role === "hr"
                             ? "bg-purple-100 text-purple-900 border border-purple-300"
                             : emp.role === "hod"
-                            ? "bg-blue-100 text-blue-900 border border-blue-300"
-                            : "bg-slate-100 text-slate-700 border border-slate-300"
-                        }`}
+                              ? "bg-blue-100 text-blue-900 border border-blue-300"
+                              : "bg-slate-100 text-slate-700 border border-slate-300"
+                          }`}
                       >
                         {emp.role}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-3">
                       {emp.isPanelJudge ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                          <CheckCircle2 size={10} /> Panel Judge
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                          <CheckCircle2 size={11} /> Panel Judge
                         </span>
                       ) : (
                         <span className="text-blue-900/40">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-2.5 text-right space-x-2">
+                    <td className="px-4 py-3 text-right space-x-2">
                       <button
                         onClick={() => openEditModal(emp)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-blue-900/15 bg-white px-2.5 py-1 text-xs font-semibold text-blue-900 hover:bg-blue-50 transition active:scale-95 shadow-sm"
+                        className="inline-flex items-center gap-1 rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50 transition active:scale-95 shadow-2xs"
                       >
-                        <Edit3 size={12} /> Edit Details
+                        <Edit3 size={13} /> Edit
                       </button>
                       <button
                         onClick={() => handleDeleteEmpClick(emp)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 transition active:scale-95 shadow-sm"
+                        className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 transition active:scale-95 shadow-2xs"
                         title="Delete Employee"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={13} />
                       </button>
                     </td>
                   </tr>
@@ -1258,69 +1274,228 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </Card>
 
-      {/* Edit Employee Details Modal */}
+
+      {/* Modals Section */}
+      {/* 1. Stage Action Password Auth Modal */}
+      {stageAuthAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                  <Key size={18} />
+                </div>
+                <h3 className="text-sm font-bold text-blue-950">{stageAuthAction.title}</h3>
+              </div>
+              <button onClick={() => setStageAuthAction(null)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-blue-900/70 leading-relaxed">
+              This action alters live cycle stage visibility. Enter your <strong>Admin Password</strong> to authorize:
+            </p>
+
+            {stageAuthError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <AlertTriangle size={15} />
+                <span>{stageAuthError}</span>
+              </div>
+            )}
+
+            <form onSubmit={executeStageAuthAction} className="space-y-4">
+              <div>
+                <Label>Admin Password</Label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter Admin Password..."
+                  value={stageAuthPassword}
+                  onChange={(e) => setStageAuthPassword(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStageAuthAction(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={stageAuthSubmitting}
+                  className="rounded-xl bg-[#0A2540] px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900"
+                >
+                  {stageAuthSubmitting ? "Authorizing..." : "Confirm & Authorize"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Add Employee Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
+                  <UserPlus size={18} />
+                </div>
+                <h3 className="text-base font-bold text-blue-950">Add New Employee Account</h3>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {addMsg && (
+              <div
+                className={`flex items-center gap-2 rounded-xl p-3 text-xs font-medium ${addMsg.type === "success"
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border border-red-200 bg-red-50 text-red-800"
+                  }`}
+              >
+                {addMsg.type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+                <span>{addMsg.msg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAddEmpSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Employee Code (Unique)</Label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. EMP105"
+                    value={addCode}
+                    onChange={(e) => setAddCode(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <Label>Full Employee Name</Label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Full Name"
+                    value={addName}
+                    onChange={(e) => setAddName(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Department / Unit</Label>
+                  <select value={addUnitId} onChange={(e) => setAddUnitId(e.target.value)} className={inputCls}>
+                    {UNITS.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>System Role</Label>
+                  <select
+                    value={addRole}
+                    onChange={(e) => setAddRole(e.target.value as "employee" | "hod" | "hr")}
+                    className={inputCls}
+                  >
+                    <option value="employee">Employee</option>
+                    <option value="hod">HOD (Department Head)</option>
+                    <option value="hr">HR Admin</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="addIsPanelJudge"
+                  checked={addIsPanelJudge}
+                  onChange={(e) => setAddIsPanelJudge(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-800 focus:ring-blue-700"
+                />
+                <label htmlFor="addIsPanelJudge" className="text-xs font-semibold text-blue-950">
+                  Appoint as Panel Judge (`isPanelJudge: true`)
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addSaving}
+                  className="rounded-xl bg-[#0A2540] px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900"
+                >
+                  {addSaving ? "Saving..." : "Create Employee Account"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Edit Employee Modal */}
       {editingEmp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4">
+          <div className="w-full max-w-lg rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
                   <Edit3 size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold tracking-tight text-blue-950">
-                    Edit Employee Details
-                  </h3>
-                  <p className="text-xs text-blue-900/60 font-mono">
-                    Code: <strong>{editingEmp.code}</strong>
-                  </p>
+                  <h3 className="text-base font-bold text-blue-950">Edit Employee Details</h3>
+                  <p className="text-xs text-blue-900/60 font-mono">Code: <strong>{editingEmp.code}</strong></p>
                 </div>
               </div>
-              <button
-                onClick={() => setEditingEmp(null)}
-                className="rounded-lg p-1.5 text-blue-900/40 hover:bg-blue-900/5 hover:text-blue-950 transition"
-              >
+              <button onClick={() => setEditingEmp(null)} className="p-1 text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>
 
             {editStatusMsg && (
               <div
-                className={`mt-4 flex items-center gap-2 rounded-xl p-3 text-xs font-medium ${
-                  editStatusMsg.type === "success"
+                className={`flex items-center gap-2 rounded-xl p-3 text-xs font-medium ${editStatusMsg.type === "success"
                     ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                     : "border border-red-200 bg-red-50 text-red-800"
-                }`}
+                  }`}
               >
                 {editStatusMsg.type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
                 <span>{editStatusMsg.msg}</span>
               </div>
             )}
 
-            <form onSubmit={handleSaveEmpEditClick} className="mt-4 space-y-4">
+            <form onSubmit={handleSaveEmpEditClick} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    Employee Name
-                  </label>
+                  <Label>Employee Name</Label>
                   <input
                     type="text"
                     required
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700"
+                    className={inputCls}
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    Department / Unit
-                  </label>
-                  <select
-                    value={editUnitId}
-                    onChange={(e) => setEditUnitId(e.target.value)}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none focus:border-blue-700"
-                  >
+                  <Label>Department / Unit</Label>
+                  <select value={editUnitId} onChange={(e) => setEditUnitId(e.target.value)} className={inputCls}>
                     {UNITS.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name}
@@ -1332,98 +1507,55 @@ export const HrView: React.FC<HrViewProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    System Role
-                  </label>
+                  <Label>System Role</Label>
                   <select
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value as "employee" | "hod" | "hr")}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none focus:border-blue-700"
+                    className={inputCls}
                   >
                     <option value="employee">Employee</option>
                     <option value="hod">HOD (Department Head)</option>
                     <option value="hr">HR Admin</option>
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    Gender
-                  </label>
-                  <select
-                    value={editGender}
-                    onChange={(e) => setEditGender(e.target.value)}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none focus:border-blue-700"
-                  >
-                    <option value="">Unspecified</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
+                  <Label>Change Password</Label>
+                  <input
+                    type="password"
+                    placeholder="New password (optional)"
+                    value={editNewPassword}
+                    onChange={(e) => setEditNewPassword(e.target.value)}
+                    className={inputCls}
+                  />
                 </div>
               </div>
 
-              <div className="pt-2">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-blue-950">
-                  <input
-                    type="checkbox"
-                    checked={editIsPanelJudge}
-                    onChange={(e) => setEditIsPanelJudge(e.target.checked)}
-                    className="h-4 w-4 rounded border-blue-900/30 text-blue-800 focus:ring-blue-700"
-                  />
-                  <span>Assign as Panel Judge for Scoring</span>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="editIsPanelJudge"
+                  checked={editIsPanelJudge}
+                  onChange={(e) => setEditIsPanelJudge(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-800 focus:ring-blue-700"
+                />
+                <label htmlFor="editIsPanelJudge" className="text-xs font-semibold text-blue-950">
+                  Appoint as Panel Judge (`isPanelJudge: true`)
                 </label>
               </div>
 
-              <div className="border-t border-blue-900/10 pt-3 space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900/70 flex items-center gap-1.5">
-                  <Key size={13} /> Admin Password Control
-                </h4>
-
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-amber-900 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
-                    <input
-                      type="checkbox"
-                      checked={editResetDefault}
-                      onChange={(e) => {
-                        setEditResetDefault(e.target.checked);
-                        if (e.target.checked) setEditNewPassword("");
-                      }}
-                      className="h-4 w-4 rounded border-amber-400 text-amber-700"
-                    />
-                    <span>Reset Password to Default Formula</span>
-                  </label>
-                </div>
-
-                {!editResetDefault && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-blue-900/60 mb-1">
-                      Set Custom New Password (optional)
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="Leave blank to keep existing password"
-                      value={editNewPassword}
-                      onChange={(e) => setEditNewPassword(e.target.value)}
-                      className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 flex items-center justify-end gap-3 border-t border-blue-900/10 pt-4">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setEditingEmp(null)}
-                  className="rounded-xl border border-blue-900/15 bg-white px-4 py-2 text-xs font-semibold text-blue-950 hover:bg-blue-50/50 transition"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={editSaving}
-                  className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition-all disabled:opacity-50"
+                  className="rounded-xl bg-[#0A2540] px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900"
                 >
-                  {editSaving ? "Saving..." : "Save Details"}
+                  Save Details
                 </button>
               </div>
             </form>
@@ -1431,37 +1563,29 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       )}
 
-      {/* 1. Yes / No Confirmation Pop-up */}
-      {showConfirmPrompt && editingEmp && (
+      {/* 4. Edit Confirm Modal */}
+      {showConfirmPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
-                <AlertTriangle size={20} />
-              </div>
-              <div>
-                <h3 className="text-base font-bold tracking-tight text-blue-950">
-                  Confirm Detail Changes
-                </h3>
-                <p className="text-xs text-blue-900/60 mt-0.5">
-                  Are you sure you want to update details for employee{" "}
-                  <strong className="text-blue-950">{editName} ({editingEmp.code})</strong>?
-                </p>
-              </div>
+          <div className="w-full max-w-md rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl space-y-4 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <AlertTriangle size={24} />
             </div>
-
-            <div className="mt-6 flex items-center justify-end gap-2.5">
+            <h3 className="text-base font-bold text-blue-950">Confirm Employee Profile Edit</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to update profile details for <strong>{editingEmp?.name} ({editingEmp?.code})</strong>?
+            </p>
+            <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowConfirmPrompt(false)}
-                className="rounded-xl border border-blue-900/15 bg-white px-4 py-2 text-xs font-semibold text-blue-950 hover:bg-blue-50/50 transition"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
                 No, Cancel
               </button>
               <button
                 type="button"
                 onClick={handleProceedToPasswordAuth}
-                className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition-all"
+                className="rounded-xl bg-[#0A2540] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900"
               >
                 Yes, Continue
               </button>
@@ -1470,69 +1594,56 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       )}
 
-      {/* 2. Admin Password Authentication Pop-up */}
-      {showAdminAuthPrompt && editingEmp && (
+      {/* 5. Admin Password Auth Prompt for Edit */}
+      {showAdminAuthPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
                   <Key size={18} />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight text-blue-950">
-                    Admin Password Verification
-                  </h3>
-                  <p className="text-[11px] text-blue-900/60">
-                    Enter your Admin password to authorize changes.
-                  </p>
-                </div>
+                <h3 className="text-sm font-bold text-blue-950">Admin Authorization Required</h3>
               </div>
-              <button
-                onClick={() => setShowAdminAuthPrompt(false)}
-                className="rounded-lg p-1 text-blue-900/40 hover:bg-blue-900/5 hover:text-blue-950 transition"
-              >
-                <X size={16} />
+              <button onClick={() => setShowAdminAuthPrompt(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X size={18} />
               </button>
             </div>
 
             {adminAuthError && (
-              <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-800">
-                <AlertTriangle size={14} className="shrink-0 text-red-600" />
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <AlertTriangle size={15} />
                 <span>{adminAuthError}</span>
               </div>
             )}
 
-            <form onSubmit={executeEmpEditWithAdminPassword} className="mt-4 space-y-4">
+            <form onSubmit={executeEmpEditWithAdminPassword} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                  Your Admin Password *
-                </label>
+                <Label>Admin Password</Label>
                 <input
                   type="password"
                   required
-                  autoFocus
-                  placeholder="Enter your Admin password"
+                  placeholder="Enter Admin Password..."
                   value={adminPasswordInput}
                   onChange={(e) => setAdminPasswordInput(e.target.value)}
-                  className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20"
+                  className={inputCls}
                 />
               </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2.5">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAdminAuthPrompt(false)}
-                  className="rounded-xl border border-blue-900/15 bg-white px-3.5 py-2 text-xs font-semibold text-blue-950 hover:bg-blue-50/50 transition"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editSaving}
-                  className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition-all disabled:opacity-50"
+                  className="rounded-xl bg-[#0A2540] px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900"
                 >
-                  {editSaving ? "Authorizing..." : "Confirm & Save"}
+                  {editSaving ? "Saving..." : "Authorize & Update"}
                 </button>
               </div>
             </form>
@@ -1540,340 +1651,93 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       )}
 
-      {/* 1. Yes / No Delete Confirmation Pop-up */}
-      {showDeleteConfirmPrompt && deletingEmpTarget && (
+      {/* 6. Delete Confirm Modal */}
+      {showDeleteConfirmPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl border border-red-900/10 bg-white p-6 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700">
-                <Trash2 size={20} />
-              </div>
-              <div>
-                <h3 className="text-base font-bold tracking-tight text-red-950">
-                  Confirm Employee Deletion
-                </h3>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Are you sure you want to delete employee{" "}
-                  <strong className="text-red-950">{deletingEmpTarget.name} ({deletingEmpTarget.code})</strong>? This action cannot be undone.
-                </p>
-              </div>
+          <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-2xl space-y-4 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <Trash2 size={24} />
             </div>
-
-            <div className="mt-6 flex items-center justify-end gap-2.5">
+            <h3 className="text-base font-bold text-red-950">Delete Employee Account</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to permanently delete employee <strong>{deletingEmpTarget?.name} ({deletingEmpTarget?.code})</strong>?
+            </p>
+            <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirmPrompt(false)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
                 No, Cancel
               </button>
               <button
                 type="button"
                 onClick={handleProceedToDeletePasswordAuth}
-                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:bg-red-700 active:scale-95 transition-all"
+                className="rounded-xl bg-red-600 px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-red-700"
               >
-                Yes, Delete
+                Yes, Continue
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. Delete Admin Password Authentication Pop-up */}
-      {showDeleteAdminAuthPrompt && deletingEmpTarget && (
+      {/* 7. Delete Admin Password Auth Prompt */}
+      {showDeleteAdminAuthPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl border border-red-900/10 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-red-900/10 pb-3">
+          <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-100 text-red-700">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-100 text-red-600">
                   <Key size={18} />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight text-red-950">
-                    Admin Password Verification
-                  </h3>
-                  <p className="text-[11px] text-slate-600">
-                    Enter your Admin password to authorize deletion.
-                  </p>
-                </div>
+                <h3 className="text-sm font-bold text-red-950">Authorize Employee Deletion</h3>
               </div>
-              <button
-                onClick={() => setShowDeleteAdminAuthPrompt(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-              >
-                <X size={16} />
+              <button onClick={() => setShowDeleteAdminAuthPrompt(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X size={18} />
               </button>
             </div>
 
             {deleteAdminAuthError && (
-              <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-800">
-                <AlertTriangle size={14} className="shrink-0 text-red-600" />
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <AlertTriangle size={15} />
                 <span>{deleteAdminAuthError}</span>
               </div>
             )}
 
-            <form onSubmit={executeEmpDeleteWithAdminPassword} className="mt-4 space-y-4">
+            <form onSubmit={executeEmpDeleteWithAdminPassword} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Your Admin Password *
-                </label>
+                <Label>Admin Password</Label>
                 <input
                   type="password"
                   required
-                  autoFocus
-                  placeholder="Enter your Admin password"
+                  placeholder="Enter Admin Password..."
                   value={deleteAdminPasswordInput}
                   onChange={(e) => setDeleteAdminPasswordInput(e.target.value)}
-                  className="w-full rounded-xl border border-red-900/15 bg-white px-3 py-2 text-xs text-slate-900 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20"
+                  className={inputCls}
                 />
               </div>
 
-              <div className="mt-5 flex items-center justify-end gap-2.5">
+              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowDeleteAdminAuthPrompt(false)}
-                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={deleteSaving}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50"
+                  className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-red-700"
                 >
-                  {deleteSaving ? "Authorizing..." : "Confirm & Delete"}
+                  {deleteSaving ? "Deleting..." : "Confirm & Delete"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Add New Employee Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
-                  <UserPlus size={18} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold tracking-tight text-blue-950">
-                    Register New Employee
-                  </h3>
-                  <p className="text-xs text-blue-900/60">
-                    Add new employee record to MongoDB master directory.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="rounded-lg p-1.5 text-blue-900/40 hover:bg-blue-900/5 hover:text-blue-950 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {addMsg && (
-              <div
-                className={`mt-4 flex items-center gap-2 rounded-xl p-3 text-xs font-medium ${
-                  addMsg.type === "success"
-                    ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border border-red-200 bg-red-50 text-red-800"
-                }`}
-              >
-                {addMsg.type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
-                <span>{addMsg.msg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddEmpSubmit} className="mt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    Employee Code (ID) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. M1005"
-                    value={addCode}
-                    onChange={(e) => setAddCode(e.target.value)}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-mono text-blue-950 outline-none focus:border-blue-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    Employee Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Amit Verma"
-                    value={addName}
-                    onChange={(e) => setAddName(e.target.value)}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    Department / Unit *
-                  </label>
-                  <select
-                    value={addUnitId}
-                    onChange={(e) => setAddUnitId(e.target.value)}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none focus:border-blue-700"
-                  >
-                    {UNITS.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    System Role
-                  </label>
-                  <select
-                    value={addRole}
-                    onChange={(e) => setAddRole(e.target.value as "employee" | "hod" | "hr")}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none focus:border-blue-700"
-                  >
-                    <option value="employee">Employee</option>
-                    <option value="hod">HOD (Department Head)</option>
-                    <option value="hr">HR Admin</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                    Gender
-                  </label>
-                  <select
-                    value={addGender}
-                    onChange={(e) => setAddGender(e.target.value)}
-                    className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none focus:border-blue-700"
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center pt-5">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-blue-950">
-                    <input
-                      type="checkbox"
-                      checked={addIsPanelJudge}
-                      onChange={(e) => setAddIsPanelJudge(e.target.checked)}
-                      className="h-4 w-4 rounded border-blue-900/30 text-blue-800 focus:ring-blue-700"
-                    />
-                    <span>Assign as Panel Judge</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center justify-end gap-3 border-t border-blue-900/10 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="rounded-xl border border-blue-900/15 bg-white px-4 py-2 text-xs font-semibold text-blue-950 hover:bg-blue-50/50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={addSaving}
-                  className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {addSaving ? "Registering..." : "Register Employee"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Stage & Announce Password Verification Modal */}
-      {stageAuthAction && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
-                  <Key size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold tracking-tight text-blue-950">
-                    Admin Password Required
-                  </h3>
-                  <p className="text-[11px] text-blue-900/60 mt-0.5">
-                    {stageAuthAction.title}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setStageAuthAction(null)}
-                className="rounded-lg p-1 text-blue-900/40 hover:bg-blue-900/5 hover:text-blue-950 transition"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {stageAuthError && (
-              <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-800">
-                <AlertTriangle size={14} className="shrink-0 text-red-600" />
-                <span>{stageAuthError}</span>
-              </div>
-            )}
-
-            <form onSubmit={executeStageAuthAction} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                  Your Admin Password *
-                </label>
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  placeholder="Enter your Admin password"
-                  value={stageAuthPassword}
-                  onChange={(e) => setStageAuthPassword(e.target.value)}
-                  className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setStageAuthAction(null)}
-                  className="rounded-xl border border-blue-900/15 bg-white px-3.5 py-2 text-xs font-semibold text-blue-950 hover:bg-blue-50/50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={stageAuthSubmitting}
-                  className="rounded-xl bg-blue-800 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {stageAuthSubmitting ? "Verifying..." : "Confirm & Proceed"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-
     </div>
   );
 };

@@ -3,12 +3,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
+  LayoutDashboard,
   ClipboardList,
   ShieldCheck,
   Scale,
   Trophy,
   RefreshCw,
-  Check,
   AlertTriangle,
   LogOut,
   UserCheck,
@@ -18,6 +18,10 @@ import {
   X,
   CheckCircle2,
   Calendar,
+  HelpCircle,
+  Menu,
+  Bell,
+  Settings,
 } from "lucide-react";
 import { UNITS, STAGES, PRIZE, POINTS } from "../lib/constants";
 import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
@@ -25,13 +29,15 @@ import { loadCycle, saveCycle, loadBranding, loadPoints } from "../lib/storage";
 import { getAuthSession, logoutUser } from "../lib/auth";
 import { Cycle, PointsState, Branding, Role, AuthUser } from "../lib/types";
 import BrandMark from "../components/BrandMark";
+import DashboardView from "../views/DashboardView";
 import NominateView from "../views/NominateView";
 import HodView from "../views/HodView";
 import JudgeView from "../views/JudgeView";
 import HrView from "../views/HrView";
 import ResultsView from "../views/ResultsView";
+import SettingsView from "../views/SettingsView";
 
-export type TabId = Role | "results";
+export type TabId = "dashboard" | Role | "results" | "settings";
 
 export default function RRAdmin() {
   const router = useRouter();
@@ -45,67 +51,13 @@ export default function RRAdmin() {
   const [brand, setBrand] = useState<Branding>({ logoUrl: "" });
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [role, setRole] = useState<TabId>("employee");
+  const [role, setRole] = useState<TabId>("dashboard");
   const [asUnit, setAsUnit] = useState(UNITS[0].id);
   const [asJudge, setAsJudge] = useState("j1");
 
-  // Change Password Modal States
-  const [showChangePassModal, setShowChangePassModal] = useState(false);
-  const [currentPass, setCurrentPass] = useState("");
-  const [newPass, setNewPass] = useState("");
-  const [confirmPass, setConfirmPass] = useState("");
-  const [changePassError, setChangePassError] = useState<string | null>(null);
-  const [changePassSuccess, setChangePassSuccess] = useState<string | null>(null);
-  const [changePassLoading, setChangePassLoading] = useState(false);
-
-  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setChangePassError(null);
-    setChangePassSuccess(null);
-
-    if (newPass.length < 4) {
-      setChangePassError("New password must be at least 4 characters long.");
-      return;
-    }
-
-    if (newPass !== confirmPass) {
-      setChangePassError("New password and confirm password do not match.");
-      return;
-    }
-
-    setChangePassLoading(true);
-
-    try {
-      const res = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentPassword: currentPass,
-          newPassword: newPass,
-          confirmPassword: confirmPass,
-        }),
-      });
-
-      const data = await res.json();
-      setChangePassLoading(false);
-
-      if (!res.ok) {
-        setChangePassError(data.error || "Failed to update password.");
-      } else {
-        setChangePassSuccess(data.message || "Password updated successfully!");
-        setCurrentPass("");
-        setNewPass("");
-        setConfirmPass("");
-        setTimeout(() => {
-          setShowChangePassModal(false);
-          setChangePassSuccess(null);
-        }, 2000);
-      }
-    } catch (err) {
-      setChangePassLoading(false);
-      setChangePassError("Network error while changing password.");
-    }
-  };
+  // Mobile menu & Help Center state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // Load session from cookie and set RBAC role defaults
   useEffect(() => {
@@ -113,18 +65,6 @@ export default function RRAdmin() {
       const session = await getAuthSession();
       if (session.authenticated && session.user) {
         setCurrentUser(session.user);
-        const userRole = session.user.role;
-        const isJudge = Boolean(session.user.isPanelJudge);
-
-        // Default tab based on role & judge status
-        if (userRole === "hr") {
-          setRole("hr");
-        } else if (userRole === "hod") {
-          setRole("hod");
-        } else {
-          setRole("employee");
-        }
-
         if (session.user.unitId) setAsUnit(session.user.unitId);
         if (session.user.judgeId) setAsJudge(session.user.judgeId);
       }
@@ -170,7 +110,6 @@ export default function RRAdmin() {
     }
   };
 
-  const stageIdx = STAGES.findIndex((s) => s.id === cycle.stage);
   const locked = cycle.stage === "announced";
 
   const monthLabel = new Date(`${month}-01T00:00:00`).toLocaleDateString(
@@ -178,445 +117,378 @@ export default function RRAdmin() {
     { month: "long", year: "numeric" }
   );
 
-  // All potential tabs
-  const allTabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number }> }> = [
-    { id: "employee", label: "Self nomination", icon: ClipboardList },
-    { id: "hod", label: "HOD endorsement (2 Push)", icon: ShieldCheck },
-    { id: "judge", label: "Panel scoring", icon: Scale },
-    { id: "results", label: "Results", icon: Award },
-    { id: "hr", label: "HR console", icon: Trophy },
+  // All potential tabs matching reference UI naming & icons
+  const allTabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "employee", label: "Self Nomination", icon: ClipboardList },
+    { id: "hod", label: "HOD Endorsements", icon: ShieldCheck },
+    { id: "judge", label: "Panel Scoring", icon: Scale },
+    { id: "results", label: "Result", icon: Award },
+    { id: "hr", label: "HR Console", icon: Trophy },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   // Filter permitted tabs based on user role & isPanelJudge DB boolean (RBAC)
-  // Panel scoring tab ("judge") is ONLY visible to users with isPanelJudge === true in DB
   const isPanelJudge = Boolean(currentUser?.isPanelJudge);
 
   const allowedRoles: TabId[] = currentUser
     ? currentUser.role === "hr"
       ? isPanelJudge
-        ? ["employee", "hod", "judge", "results", "hr"]
-        : ["employee", "hod", "results", "hr"]
+        ? ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
+        : ["dashboard", "employee", "hod", "results", "hr", "settings"]
       : currentUser.role === "hod"
         ? isPanelJudge
-          ? ["hod", "judge", "results"]
-          : ["hod", "results"]
+          ? ["dashboard", "hod", "judge", "results", "settings"]
+          : ["dashboard", "hod", "results", "settings"]
         : isPanelJudge
-          ? ["employee", "judge", "results"]
-          : ["employee", "results"]
-    : ["employee", "results"];
+          ? ["dashboard", "employee", "judge", "results", "settings"]
+          : ["dashboard", "employee", "results", "settings"]
+    : ["dashboard", "employee", "results", "settings"];
 
   const visibleTabs = allTabs.filter((t) => allowedRoles.includes(t.id));
-
-  // Ensure active tab is within allowed roles
   const activeRole = allowedRoles.includes(role) ? role : allowedRoles[0];
 
   return (
-    <div className="min-h-screen text-blue-950" style={{ backgroundColor: "#EFF3F8" }}>
-      {/* Header Top Bar (Contains ONLY Logo, Company Name, Username, & Logout Button) */}
-      <header className="text-white shadow-md bg-[#0A2540]">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4">
-          {/* Logo & Company Name */}
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#F5F7FA] text-blue-950 flex flex-col md:flex-row">
+      {/* Mobile Top Header */}
+      <div className="md:hidden flex items-center justify-between bg-[#0A2540] text-white p-4 sticky top-0 z-40 shadow-md">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <BrandMark url={brand.logoUrl} />
+          <span className="font-bold text-sm tracking-tight text-white">MAHLE Anand</span>
+        </div>
+        {currentUser && (
+          <span className="text-xs font-semibold bg-white/10 px-2.5 py-1 rounded-full text-sky-200">
+            {currentUser.name.split(" ")[0]}
+          </span>
+        )}
+      </div>
+
+      {/* Backdrop overlay for mobile menu */}
+      {mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-black/50 md:hidden backdrop-blur-xs"
+        />
+      )}
+
+      {/* Left Sidebar Navigation Container */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 min-w-[16rem] max-w-[16rem] shrink-0 grow-0 bg-white border-r border-slate-200/80 flex flex-col justify-between transition-transform duration-200 shadow-lg md:shadow-none md:sticky md:top-0 md:h-screen md:translate-x-0 overflow-y-auto ${
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Top Header & Navigation Section */}
+        <div>
+          {/* Brand Header */}
+          <div className="p-6 border-b border-slate-100 flex items-center gap-3.5 shrink-0">
             <BrandMark url={brand.logoUrl} />
-            <div>
-              <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
-                MAHLE ANAND Filter Systems
+            <div className="min-w-0">
+              <h1 className="text-base font-extrabold tracking-tight text-blue-950 leading-tight truncate">
+                MAHLE Anand
               </h1>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-sky-200/80">
-                Rewards &amp; Recognition Portal
+              <p className="text-xs font-medium text-slate-400 truncate">
+                Corporate Rewards
               </p>
             </div>
           </div>
 
-          {/* Username, Designation/Role, Panel Judge Badge, Change Password, & Logout Button */}
-          <div className="flex items-center gap-3">
-            {currentUser && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2.5 rounded-xl border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs text-white backdrop-blur-sm shadow-sm">
-                  <UserCheck size={15} className="text-sky-300 shrink-0" />
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 leading-tight">
-                    <strong className="font-bold text-white text-xs">{currentUser.name}</strong>
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded bg-sky-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-200 uppercase tracking-wider border border-sky-300/30">
-                        {currentUser.designation || currentUser.role}
-                      </span>
-                      {currentUser.isPanelJudge && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/25 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-200 border border-emerald-300/40 shadow-sm backdrop-blur-sm">
-                          <Award size={10} className="text-emerald-300" /> Panel Judge
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowChangePassModal(true);
-                    setChangePassError(null);
-                    setChangePassSuccess(null);
-                    setCurrentPass("");
-                    setNewPass("");
-                    setConfirmPass("");
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300/30 bg-sky-400/10 px-3 py-1.5 text-xs font-medium text-sky-200 hover:bg-sky-400/20 hover:text-white transition-all duration-150 active:scale-95 shadow-sm"
-                  title="Change Password"
-                >
-                  <Key size={13} className="text-sky-300" />
-                  <span className="hidden sm:inline">Change Password</span>
-                </button>
-              </div>
-            )}
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-red-600 to-red-700 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:from-red-700 hover:to-red-800 active:scale-95 transition-all duration-150"
-              title="Sign Out"
-            >
-              <LogOut size={13} /> Logout
-            </button>
-          </div>
-        </div>
-
-        {/* Timeline Bar Directly Below Top Bar with Glassmorphism for Current Timeline */}
-        <div className="border-t border-white/10 bg-[#0A2540]/90 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-6xl flex-wrap gap-3 px-5 py-3.5">
-            {(() => {
-              const timeline = getCycleTimeline(cycle);
-              return STAGES.map((s, i) => {
-                let windowText = s.window;
-                let isExtended = false;
-                if (s.id === "nomination") {
-                  const p = timeline.nomination;
-                  windowText = `${formatDatePretty(p.startDate)} – ${formatDatePretty(getEffectiveEndDate(p))}`;
-                  isExtended = Boolean(p.isExtended);
-                } else if (s.id === "validation") {
-                  const p = timeline.hodEndorsement;
-                  windowText = `${formatDatePretty(p.startDate)} – ${formatDatePretty(getEffectiveEndDate(p))}`;
-                  isExtended = Boolean(p.isExtended);
-                } else if (s.id === "judging") {
-                  const p = timeline.panelScoring;
-                  windowText = `${formatDatePretty(p.startDate)} – ${formatDatePretty(getEffectiveEndDate(p))}`;
-                  isExtended = Boolean(p.isExtended);
-                }
-
-                const isCurrent = i === stageIdx;
-                const isPassed = i < stageIdx;
-
-                return (
-                  <div
-                    key={s.id}
-                    style={{ minWidth: "160px" }}
-                    className={`relative flex flex-1 items-center gap-3 transition-all duration-300 ${
-                      isCurrent
-                        ? "backdrop-blur-md bg-white/20 border border-white/40 text-white shadow-xl shadow-sky-950/40 ring-2 ring-sky-300/60 rounded-2xl p-3.5"
-                        : isPassed
-                        ? "bg-white/5 border border-white/10 text-sky-200/70 rounded-xl p-3"
-                        : "bg-white/[0.02] border border-white/5 text-white/30 rounded-xl p-3"
-                    }`}
-                  >
-                    {/* Glass Reflection Highlight overlay on active stage */}
-                    {isCurrent && (
-                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/25 via-white/5 to-transparent pointer-events-none" />
-                    )}
-
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-xs font-bold ${
-                        isCurrent
-                          ? "bg-sky-400 text-blue-950 shadow-md shadow-sky-400/30 ring-2 ring-white/50"
-                          : isPassed
-                          ? "bg-white/20 text-white"
-                          : "bg-white/10 text-white/40"
-                      }`}
-                    >
-                      {isPassed ? <Check size={14} /> : i + 1}
-                    </span>
-
-                    <span className="leading-tight z-10">
-                      <span className="block text-xs font-bold tracking-tight flex items-center gap-1.5">
-                        {s.label}
-                        {isExtended && (
-                          <span className="rounded-full bg-amber-400/30 px-1.5 py-0.5 text-[9px] font-extrabold uppercase text-amber-200 border border-amber-300/40 shadow-sm backdrop-blur-sm">
-                            Ext
-                          </span>
-                        )}
-                      </span>
-                      <span className={`block font-mono text-[11px] mt-0.5 ${isCurrent ? "text-sky-100 font-semibold" : "opacity-75"}`}>
-                        {windowText}
-                      </span>
-                    </span>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        </div>
-      </header>
-
-      {/* Identity strip with Role-Based Navigation */}
-      <div className="border-b border-blue-900/10 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-3 px-5 py-3">
-          <div className="flex flex-wrap gap-1">
+          {/* Nav Menu Links */}
+          <nav className="p-4 space-y-1.5">
             {visibleTabs.map((t) => {
               const Icon = t.icon;
               const isActive = activeRole === t.id;
               return (
                 <button
                   key={t.id}
-                  onClick={() => setRole(t.id)}
-                  className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all duration-150 ${
+                  onClick={() => {
+                    setRole(t.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-150 ${
                     isActive
-                      ? "bg-[#0A2540] text-white shadow-md shadow-blue-950/20"
-                      : "text-blue-900/70 hover:bg-blue-900/5 hover:text-blue-950"
+                      ? "bg-sky-100/70 text-blue-950 shadow-xs border border-sky-200/60"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-blue-950"
                   }`}
                 >
-                  <Icon size={14} /> {t.label}
+                  <Icon size={18} className={isActive ? "text-blue-700 shrink-0" : "text-slate-400 shrink-0"} />
+                  <span className="truncate">{t.label}</span>
                 </button>
               );
             })}
-          </div>
+          </nav>
+        </div>
 
-          {/* Unit selector for HOD or HR */}
-          {activeRole === "hod" && (
-            <div className="flex items-center gap-2">
-              <select
-                value={asUnit}
-                disabled={currentUser?.role === "hod"} // Lock to HOD's assigned unit
-                onChange={(e) => setAsUnit(e.target.value)}
-                className="rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-medium text-blue-950 disabled:bg-blue-900/5 shadow-sm"
-              >
-                {UNITS.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.kind === "Plant" ? `Plant — ${u.name}` : u.name}
-                  </option>
-                ))}
-              </select>
-              {currentUser?.role === "hod" && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-900/50" title="Assigned Unit Locked">
-                  <Lock size={12} /> Assigned Unit
-                </span>
-              )}
-            </div>
-          )}
+        {/* Sidebar Footer Options */}
+        <div className="p-4 border-t border-slate-100 space-y-1 shrink-0">
+          {/* Help Center */}
+          <button
+            onClick={() => {
+              setShowHelpModal(true);
+              setMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-semibold whitespace-nowrap text-slate-600 hover:bg-slate-50 hover:text-blue-950 rounded-xl transition-all"
+          >
+            <HelpCircle size={18} className="text-slate-400 shrink-0" />
+            <span className="truncate">Help Center</span>
+          </button>
 
-          {/* Judge position selector for Judge or HR */}
-          {activeRole === "judge" && (
-            <div className="flex items-center gap-2">
-              <select
-                value={asJudge}
-                disabled={currentUser?.role === "judge" || currentUser?.isPanelJudge} // Lock to Judge's assigned position
-                onChange={(e) => setAsJudge(e.target.value)}
-                className="rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-medium text-blue-950 disabled:bg-blue-900/5 shadow-sm"
-              >
-                {cycle.judges.map((j, i) => (
-                  <option key={j.id} value={j.id}>
-                    {j.name ? j.name : `Judge ${i + 1} (unnamed)`}
-                  </option>
-                ))}
-              </select>
-              {(currentUser?.role === "judge" || currentUser?.isPanelJudge) && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-900/50" title="Assigned Judge Slot Locked">
-                  <Lock size={12} /> Assigned Slot
-                </span>
-              )}
-            </div>
-          )}
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-bold whitespace-nowrap text-slate-600 hover:bg-red-50 hover:text-red-700 rounded-xl transition-all"
+          >
+            <LogOut size={18} className="text-slate-400 shrink-0" />
+            <span className="truncate">Logout</span>
+          </button>
+        </div>
+      </aside>
 
-          {/* Month Selector & Refresh Controls (Admin Only Select / Default Current Month) */}
-          <div className="ml-auto flex items-center gap-2.5">
+      {/* Main Right Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Bar */}
+        <header className="bg-white border-b border-slate-200/80 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+          {/* Left Side: Unit/Judge Selectors & Active Stage */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Unit selector for HOD or HR */}
+            {activeRole === "hod" && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={asUnit}
+                  disabled={currentUser?.role === "hod"}
+                  onChange={(e) => setAsUnit(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 shadow-xs"
+                >
+                  {UNITS.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.kind === "Plant" ? `Plant — ${u.name}` : u.name}
+                    </option>
+                  ))}
+                </select>
+                {currentUser?.role === "hod" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                    <Lock size={12} /> Assigned Unit
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Judge position selector for Judge or HR */}
+            {activeRole === "judge" && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={asJudge}
+                  disabled={currentUser?.role === "judge" || currentUser?.isPanelJudge}
+                  onChange={(e) => setAsJudge(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 shadow-xs"
+                >
+                  {cycle.judges.map((j, i) => (
+                    <option key={j.id} value={j.id}>
+                      {j.name ? j.name : `Judge ${i + 1} (unnamed)`}
+                    </option>
+                  ))}
+                </select>
+                {(currentUser?.role === "judge" || currentUser?.isPanelJudge) && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                    <Lock size={12} /> Assigned Slot
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Month Selector & Refresh Controls */}
             {currentUser?.role === "hr" ? (
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900/60 hidden sm:inline-block">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 hidden sm:inline-block">
                   Admin Month:
                 </span>
                 <input
                   type="month"
                   value={month}
                   onChange={(e) => setMonth(e.target.value)}
-                  className="rounded-xl border border-blue-900/20 bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-950 outline-none focus:border-blue-700 shadow-sm"
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-950 outline-none focus:border-blue-700 shadow-xs"
                   title="Select Active Cycle Month (Admin Access)"
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 rounded-xl border border-blue-900/15 bg-blue-50/70 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-sm">
+              <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-xs">
                 <Calendar size={13} className="text-blue-800" />
                 <span>{monthLabel}</span>
-                <span className="text-[10px] font-mono font-medium text-blue-900/50 uppercase">
-                  (Active)
-                </span>
               </div>
             )}
 
             <button
               onClick={() => refresh(month)}
-              className="inline-flex items-center gap-1 rounded-xl border border-blue-900/15 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-blue-900/80 hover:bg-blue-50/50 shadow-sm active:scale-95 transition-all"
+              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600 hover:bg-slate-50 shadow-xs active:scale-95 transition-all"
               title="Refresh cycle data"
             >
               <RefreshCw size={12} /> Refresh
             </button>
           </div>
-        </div>
-      </div>
 
-      <main className="mx-auto max-w-6xl px-5 py-6">
-        {err && (
-          <div className="mb-4 flex items-start gap-2 rounded border border-amber-500/40 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            {err}
-          </div>
-        )}
-        {loading ? (
-          <p className="py-16 text-center text-sm text-blue-900/50">
-            Loading the {monthLabel} cycle…
-          </p>
-        ) : (
-          <>
-            {activeRole === "employee" && (
-              <NominateView
-                cycle={cycle}
-                commit={commit}
-                currentUser={currentUser}
-                locked={locked}
-              />
-            )}
-            {activeRole === "hod" && (
-              <HodView
-                cycle={cycle}
-                commit={commit}
-                unitId={asUnit}
-                locked={locked}
-              />
-            )}
-            {activeRole === "judge" && (
-              <JudgeView
-                cycle={cycle}
-                commit={commit}
-                judgeId={asJudge}
-                locked={locked}
-              />
-            )}
-            {activeRole === "results" && (
-              <ResultsView cycle={cycle} />
-            )}
-            {activeRole === "hr" && (
-              <HrView
-                cycle={cycle}
-                commit={commit}
-                points={points}
-                setPoints={setPoints}
-                monthLabel={monthLabel}
-                brand={brand}
-                setBrand={setBrand}
-              />
-            )}
-          </>
-        )}
-      </main>
+          {/* Right Side: Notifications & User Profile */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowHelpModal(true)}
+              className="p-2 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 relative transition"
+              title="Notifications & Help"
+            >
+              <Bell size={18} />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-sky-500" />
+            </button>
 
-      <footer className="mx-auto max-w-6xl px-5 pb-10 text-xs leading-relaxed text-blue-900/45">
-        Winner in each category receives Rs {PRIZE.toLocaleString("en-IN")} and{" "}
-        {POINTS} monthly points. Monthly awards carry 50% weightage in the
-        year-end LSIP awards. Role-Based Access Control enforced for {currentUser?.name || "User"}.
-      </footer>
-
-      {/* Change Password Modal Pop-up */}
-      {showChangePassModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
-                  <Key size={18} />
+            {currentUser && (
+              <div
+                onClick={() => setRole("settings")}
+                className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-slate-50/80 px-3.5 py-1.5 text-xs text-blue-950 shadow-xs cursor-pointer hover:bg-slate-100 transition"
+                title="View Settings & Profile"
+              >
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-900 text-white font-bold text-xs uppercase">
+                  {currentUser.name.charAt(0)}
                 </div>
-                <div>
-                  <h3 className="text-base font-bold tracking-tight text-blue-950">
-                    Change Password
-                  </h3>
-                  <p className="text-xs text-blue-900/60">
-                    Confirm your current password and set a new password.
-                  </p>
+                <div className="flex flex-col leading-tight">
+                  <div className="flex items-center gap-1.5">
+                    <strong className="font-bold text-blue-950 text-xs">{currentUser.name}</strong>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                    {currentUser.designation || currentUser.role}
+                  </span>
                 </div>
               </div>
-              <button
-                onClick={() => setShowChangePassModal(false)}
-                className="rounded-lg p-1.5 text-blue-900/40 hover:bg-blue-900/5 hover:text-blue-950 transition"
-              >
+            )}
+          </div>
+        </header>
+
+        {/* Main View Content */}
+        <main className="flex-1 max-w-7xl w-full mx-auto p-5 md:p-8">
+          {err && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              {err}
+            </div>
+          )}
+          {loading ? (
+            <p className="py-16 text-center text-sm text-slate-500">
+              Loading the {monthLabel} cycle…
+            </p>
+          ) : (
+            <>
+              {activeRole === "dashboard" && (
+                <DashboardView
+                  cycle={cycle}
+                  points={points}
+                  currentUser={currentUser}
+                  onNavigateToNominate={() => setRole("employee")}
+                  onNavigateToEndorse={() => setRole("hod")}
+                  onNavigateToJudge={() => setRole("judge")}
+                  onNavigateToHr={() => setRole("hr")}
+                />
+              )}
+              {activeRole === "employee" && (
+                <NominateView
+                  cycle={cycle}
+                  commit={commit}
+                  currentUser={currentUser}
+                  locked={locked}
+                />
+              )}
+              {activeRole === "hod" && (
+                <HodView
+                  unitId={asUnit}
+                  cycle={cycle}
+                  commit={commit}
+                  locked={locked}
+                />
+              )}
+              {activeRole === "judge" && (
+                <JudgeView
+                  judgeId={asJudge}
+                  cycle={cycle}
+                  commit={commit}
+                  locked={locked}
+                  currentUser={currentUser}
+                />
+              )}
+              {activeRole === "hr" && (
+                <HrView
+                  cycle={cycle}
+                  commit={commit}
+                  points={points}
+                  setPoints={setPoints}
+                  monthLabel={monthLabel}
+                  brand={brand}
+                  setBrand={setBrand}
+                />
+              )}
+              {activeRole === "results" && (
+                <ResultsView
+                  cycle={cycle}
+                />
+              )}
+              {activeRole === "settings" && (
+                <SettingsView
+                  currentUser={currentUser}
+                />
+              )}
+            </>
+          )}
+        </main>
+      </div>
+
+      {/* Help Center Popup Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 text-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                  <HelpCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-blue-950">Help Center &amp; Guidelines</h3>
+                  <p className="text-xs text-slate-500">MAHLE ANAND Recognition Rules &amp; Policy</p>
+                </div>
+              </div>
+              <button onClick={() => setShowHelpModal(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition">
                 <X size={18} />
               </button>
             </div>
 
-            {changePassError && (
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-800">
-                <AlertTriangle size={15} className="shrink-0" />
-                <span>{changePassError}</span>
-              </div>
-            )}
-
-            {changePassSuccess && (
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
-                <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />
-                <span>{changePassSuccess}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleChangePasswordSubmit} className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Enter current password"
-                  className="w-full rounded-xl border border-blue-900/15 bg-white px-3.5 py-2.5 text-sm text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20"
-                  value={currentPass}
-                  onChange={(e) => setCurrentPass(e.target.value)}
-                />
+            <div className="space-y-3 text-xs text-slate-700 leading-relaxed">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <strong className="block text-sm font-bold text-blue-950 mb-1">Monthly Reward Perks</strong>
+                <p>Each monthly award winner receives <strong>Rs 2,000 cash prize</strong> and <strong>+10 points</strong> recorded in the HR annual ledger.</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Enter new password (min 4 characters)"
-                  className="w-full rounded-xl border border-blue-900/15 bg-white px-3.5 py-2.5 text-sm text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20"
-                  value={newPass}
-                  onChange={(e) => setNewPass(e.target.value)}
-                />
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-950">
+                <strong className="block text-sm font-bold mb-1">Year-End LSIP Weightage (50%)</strong>
+                <p>Cumulative monthly points carry a 50% weightage toward year-end LSIP awards.</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-blue-900/60 mb-1">
-                  Confirm New Password
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Re-enter new password to confirm"
-                  className="w-full rounded-xl border border-blue-900/15 bg-white px-3.5 py-2.5 text-sm text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20"
-                  value={confirmPass}
-                  onChange={(e) => setConfirmPass(e.target.value)}
-                />
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 space-y-1">
+                <strong className="block text-sm font-bold text-blue-950">Cycle Timeline Schedule</strong>
+                <ul className="list-disc pl-4 space-y-0.5 font-medium">
+                  <li>Self Nomination: 1st – 7th of Month</li>
+                  <li>HOD Review &amp; Endorsement: 8th – 9th of Month</li>
+                  <li>Panel Scoring: 10th – 12th of Month</li>
+                  <li>Winners Announced: 15th of Month</li>
+                </ul>
               </div>
+            </div>
 
-              <div className="mt-6 flex items-center justify-end gap-3 border-t border-blue-900/10 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowChangePassModal(false)}
-                  className="rounded-xl border border-blue-900/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-blue-950 hover:bg-blue-50/50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={changePassLoading}
-                  className="rounded-xl bg-gradient-to-r from-blue-800 to-blue-900 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-white shadow-md hover:from-blue-900 hover:to-blue-950 active:scale-95 transition-all duration-150 disabled:opacity-50"
-                >
-                  {changePassLoading ? "Updating..." : "Update Password"}
-                </button>
-              </div>
-            </form>
+            <div className="pt-2 text-right">
+              <button
+                onClick={() => setShowHelpModal(false)}
+                className="rounded-xl bg-[#0A2540] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900 transition"
+              >
+                Close Guidelines
+              </button>
+            </div>
           </div>
         </div>
       )}

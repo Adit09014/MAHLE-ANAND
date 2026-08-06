@@ -34,7 +34,9 @@ export interface Nomination {
   category: string;
   gender: string;
   citation: string;
-  evidence: string;
+  businessImpact?: string;
+  mafsValue?: string;
+  evidence?: string;
   submittedAt: string;
   validated: boolean | null;
   hrNote?: string;
