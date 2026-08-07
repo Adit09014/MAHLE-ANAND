@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     if (role === "hr" && empRecord.role !== "hr") {
       // Fallback if password matches master HR password or HR record
       const isValidPassword =
-        password === "mahle123" ||
+        password === (process.env.HR_MASTER_PASSWORD || "") ||
         verifyPassword(password, empRecord.passwordHash, empRecord.code, empRecord.name);
 
       if (!isValidPassword) {

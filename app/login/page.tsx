@@ -9,8 +9,6 @@ import {
   EyeOff,
   Award,
   AlertTriangle,
-  ArrowRight,
-  Sparkles,
 } from "lucide-react";
 import { Role } from "@/lib/types";
 import { loginUser } from "@/lib/auth";
@@ -24,7 +22,6 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +39,24 @@ export default function LoginPage() {
         /* ignore */
       }
     }
+
+    async function checkAlreadyLoggedIn() {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.authenticated) {
+            router.replace("/");
+            return;
+          }
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+
     fetchBrand();
+    checkAlreadyLoggedIn();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -207,20 +221,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Remember Me Checkbox */}
-            <div className="pt-1">
-              <label className="inline-flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-900 focus:ring-blue-700"
-                />
-                <span className="text-xs font-medium text-slate-600">
-                  Remember me for 30 days
-                </span>
-              </label>
-            </div>
 
             {/* Sign In Button */}
             <button

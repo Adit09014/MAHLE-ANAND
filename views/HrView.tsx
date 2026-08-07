@@ -547,6 +547,10 @@ export const HrView: React.FC<HrViewProps> = ({
   };
 
   const syncLedgerFromCurrentCycle = async () => {
+    const confirmed = window.confirm(
+      `Sync panel scores from ${cycle.month} into the Annual LSIP Ledger?\n\nThis will permanently record each evaluated employee's panel score for this cycle. If scores already exist for this month they will be skipped.`
+    );
+    if (!confirmed) return;
     const allScored = res
       .flatMap((r) => r.ranked)
       .filter((w) => w && w.nom && w.avg !== null && w.count > 0);

@@ -70,6 +70,8 @@ export default function RRAdmin() {
         setCurrentUser(session.user);
         if (session.user.unitId) setAsUnit(session.user.unitId);
         if (session.user.judgeId) setAsJudge(session.user.judgeId);
+      } else {
+        router.replace("/login");
       }
     }
     checkAuth();
@@ -162,7 +164,7 @@ export default function RRAdmin() {
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <BrandMark url={brand.logoUrl} />
+          <BrandMark url={brand.logoUrl} className="h-7 max-w-[110px]" />
           <span className="font-bold text-sm tracking-tight text-white">MAHLE ANAND</span>
         </div>
         {currentUser && (
@@ -189,13 +191,13 @@ export default function RRAdmin() {
         {/* Top Header & Navigation Section */}
         <div>
           {/* Brand Header */}
-          <div className="p-6 border-b border-slate-100 flex items-center gap-3.5 shrink-0">
-            <BrandMark url={brand.logoUrl} />
-            <div className="min-w-0">
-              <h1 className="text-base font-extrabold tracking-tight text-blue-950 leading-tight truncate">
+          <div className="px-5 pt-5 pb-4 border-b border-slate-100 flex flex-col gap-2 shrink-0">
+            <BrandMark url={brand.logoUrl} className="h-9 max-w-full w-auto" />
+            <div>
+              <h1 className="text-sm font-extrabold tracking-tight text-blue-950 leading-tight">
                 MAHLE ANAND
               </h1>
-              <p className="text-xs font-medium text-slate-400 truncate">
+              <p className="text-[11px] font-medium text-slate-400">
                 Corporate Rewards
               </p>
             </div>
@@ -367,9 +369,10 @@ export default function RRAdmin() {
             </div>
           )}
           {loading ? (
-            <p className="py-16 text-center text-sm text-slate-500">
-              Loading the {monthLabel} cycle…
-            </p>
+            <div className="flex flex-col items-center justify-center py-24 gap-4 text-slate-400">
+              <div className="h-10 w-10 rounded-full border-4 border-slate-200 border-t-blue-700 animate-spin" />
+              <p className="text-sm font-medium text-slate-500">Loading {monthLabel} cycle…</p>
+            </div>
           ) : (
             <>
               {activeRole === "dashboard" && (
