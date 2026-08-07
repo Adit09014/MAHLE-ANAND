@@ -505,12 +505,15 @@ export const HrView: React.FC<HrViewProps> = ({
   };
 
   const announce = async () => {
-    const winners = res
-      .map((r) => r.ranked[0])
+    const allScored = res
+      .flatMap((r) => r.ranked)
       .filter((w) => w && w.nom && w.avg !== null && w.count > 0);
     const next = { ...points };
-    winners.forEach((w) => {
+    allScored.forEach((w) => {
       const k = w.nom.code;
+      const scoreVal = Math.round(w.avg! * 10) / 10;
+      const isWinner = res.some((r) => r.ranked[0]?.nom?.id === w.nom.id);
+
       next[k] = next[k] || {
         name: w.nom.name,
         unit: w.nom.unit,
@@ -521,8 +524,13 @@ export const HrView: React.FC<HrViewProps> = ({
         (win) => win.month === cycle.month && win.category === w.nom.category
       );
       if (!winExists) {
-        next[k].points += POINTS;
-        next[k].wins.push({ month: cycle.month, category: w.nom.category });
+        next[k].points = Math.round((next[k].points + scoreVal) * 10) / 10;
+        next[k].wins.push({
+          month: cycle.month,
+          category: w.nom.category,
+          score: scoreVal,
+          isWinner,
+        });
       }
     });
     setPoints(next);
@@ -539,14 +547,17 @@ export const HrView: React.FC<HrViewProps> = ({
   };
 
   const syncLedgerFromCurrentCycle = async () => {
-    const winners = res
-      .map((r) => r.ranked[0])
+    const allScored = res
+      .flatMap((r) => r.ranked)
       .filter((w) => w && w.nom && w.avg !== null && w.count > 0);
 
     const next = { ...points };
     let addedCount = 0;
-    winners.forEach((w) => {
+    allScored.forEach((w) => {
       const k = w.nom.code;
+      const scoreVal = Math.round(w.avg! * 10) / 10;
+      const isWinner = res.some((r) => r.ranked[0]?.nom?.id === w.nom.id);
+
       next[k] = next[k] || {
         name: w.nom.name,
         unit: w.nom.unit,
@@ -557,8 +568,13 @@ export const HrView: React.FC<HrViewProps> = ({
         (win) => win.month === cycle.month && win.category === w.nom.category
       );
       if (!winExists) {
-        next[k].points += POINTS;
-        next[k].wins.push({ month: cycle.month, category: w.nom.category });
+        next[k].points = Math.round((next[k].points + scoreVal) * 10) / 10;
+        next[k].wins.push({
+          month: cycle.month,
+          category: w.nom.category,
+          score: scoreVal,
+          isWinner,
+        });
         addedCount++;
       }
     });
@@ -571,8 +587,8 @@ export const HrView: React.FC<HrViewProps> = ({
     }
     alert(
       addedCount > 0
-        ? `Successfully recorded ${addedCount} winner(s) into Annual LSIP Ledger!`
-        : "Annual LSIP Ledger is already up to date with declared winners for this month."
+        ? `Successfully recorded ${addedCount} employee score(s) into Annual LSIP Ledger!`
+        : "Annual LSIP Ledger is already up to date with scores for this month."
     );
   };
 
@@ -1040,7 +1056,7 @@ export const HrView: React.FC<HrViewProps> = ({
               <Trophy className="text-amber-500" size={18} /> Annual R&amp;R Ledger &amp; Year-End LSIP Weightage Tracker
             </h3>
             <p className="text-xs text-blue-900/70 mt-1">
-              Monthly winners receive <strong>10 points</strong> recorded in this HR ledger. Monthly awards carry a <strong>50% weightage</strong> in year-end LSIP awards.
+              Employee panel scores (0–10) are recorded in this HR annual ledger every month for year-end LSIP recognition awards.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1048,9 +1064,9 @@ export const HrView: React.FC<HrViewProps> = ({
               <button
                 onClick={syncLedgerFromCurrentCycle}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-100 px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200 transition shadow-xs active:scale-95"
-                title="Sync winner(s) from current announced cycle into Annual Ledger"
+                title="Sync scores from current announced cycle into Annual LSIP Ledger"
               >
-                <RotateCcw size={13} /> Sync Winners
+                <RotateCcw size={13} /> Sync Scores to LSIP
               </button>
             )}
             <button
@@ -1070,16 +1086,16 @@ export const HrView: React.FC<HrViewProps> = ({
               <tr>
                 <th className="px-4 py-3">Employee Code &amp; Name</th>
                 <th className="px-4 py-3">Department / Unit</th>
-                <th className="px-4 py-3 text-center">Monthly Wins</th>
-                <th className="px-4 py-3 text-center">Cumulative Points</th>
-                <th className="px-4 py-3">Winning Month(s) &amp; Categories</th>
+                <th className="px-4 py-3 text-center">Evaluations</th>
+                <th className="px-4 py-3 text-center">Cumulative LSIP Score</th>
+                <th className="px-4 py-3">Monthly Scores &amp; Categories</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-blue-900/10">
               {Object.keys(points).length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-blue-900/50 italic">
-                    No points recorded in HR annual ledger yet. Points accumulate as monthly winners are announced.
+                    No scores recorded in HR annual LSIP ledger yet. Scores accumulate as monthly evaluations are completed.
                   </td>
                 </tr>
               ) : (
@@ -1097,11 +1113,11 @@ export const HrView: React.FC<HrViewProps> = ({
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-900">
-                          {winsCount} {winsCount === 1 ? "Win" : "Wins"}
+                          {winsCount} {winsCount === 1 ? "Entry" : "Entries"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center font-mono font-bold text-amber-700">
-                        {totalPts} pts
+                        {totalPts.toFixed(1)} Pts
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
@@ -1109,9 +1125,13 @@ export const HrView: React.FC<HrViewProps> = ({
                             p.wins.map((w, idx) => (
                               <span
                                 key={idx}
-                                className="rounded bg-blue-900/5 px-2 py-0.5 text-[10px] font-medium text-blue-900/80 border border-blue-900/10"
+                                className={`rounded px-2 py-0.5 text-[10px] font-semibold border ${
+                                  w.isWinner
+                                    ? "bg-amber-100 text-amber-900 border-amber-300"
+                                    : "bg-blue-900/5 text-blue-900/80 border-blue-900/10"
+                                }`}
                               >
-                                {w.month}: {catById(w.category)?.name || w.category}
+                                {w.month}: {catById(w.category)?.name || w.category} {w.score !== undefined ? `(${w.score.toFixed(1)} Pts)` : ""}{w.isWinner ? " 🏆" : ""}
                               </span>
                             ))
                           ) : (

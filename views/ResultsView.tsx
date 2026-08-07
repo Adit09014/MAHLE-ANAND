@@ -118,7 +118,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ cycle }) => {
 
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-blue-950 pt-1">
                         <span className="text-amber-700 font-bold">
-                          Prize: Rs {PRIZE.toLocaleString("en-IN")} + {POINTS} Points
+                          Prize: Rs {PRIZE.toLocaleString("en-IN")} Cash Prize + {winner.avg !== null ? (Math.round(winner.avg * 10) / 10).toFixed(1) : "0"} Panel Score to LSIP
                         </span>
                         <span className="text-blue-900/40 text-[11px]">
                           LSIP Weightage Included

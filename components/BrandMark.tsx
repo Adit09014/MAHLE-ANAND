@@ -17,15 +17,15 @@ export const BrandMark: React.FC<BrandMarkProps> = ({ url, className, bgWhite })
   const imgElement = (
     <img
       src={logoSrc}
-      alt="MAHLE"
+      alt="MAHLE ANAND"
       onError={() => setFailed(true)}
-      className={`h-11 sm:h-14 w-auto object-contain ${className || ""}`}
+      className={`h-14 sm:h-16 lg:h-20 w-30 max-w-[280px] object-contain ${className || ""}`}
     />
   );
 
   if (bgWhite) {
     return (
-      <div className="inline-block rounded-lg bg-white p-2.5 shadow-sm">
+      <div className="inline-flex items-center justify-center rounded-xl bg-white px-1.5 py-0.5 shadow-sm border border-slate-200/50">
         {imgElement}
       </div>
     );

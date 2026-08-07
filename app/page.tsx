@@ -19,6 +19,9 @@ import {
   CheckCircle2,
   Calendar,
   HelpCircle,
+  BookOpen,
+  FileText,
+  Calculator,
   Menu,
   Bell,
   Settings,
@@ -160,7 +163,7 @@ export default function RRAdmin() {
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <BrandMark url={brand.logoUrl} />
-          <span className="font-bold text-sm tracking-tight text-white">MAHLE Anand</span>
+          <span className="font-bold text-sm tracking-tight text-white">MAHLE ANAND</span>
         </div>
         {currentUser && (
           <span className="text-xs font-semibold bg-white/10 px-2.5 py-1 rounded-full text-sky-200">
@@ -190,7 +193,7 @@ export default function RRAdmin() {
             <BrandMark url={brand.logoUrl} />
             <div className="min-w-0">
               <h1 className="text-base font-extrabold tracking-tight text-blue-950 leading-tight truncate">
-                MAHLE Anand
+                MAHLE ANAND
               </h1>
               <p className="text-xs font-medium text-slate-400 truncate">
                 Corporate Rewards
@@ -226,7 +229,7 @@ export default function RRAdmin() {
 
         {/* Sidebar Footer Options */}
         <div className="p-4 border-t border-slate-100 space-y-1 shrink-0">
-          {/* Help Center */}
+          {/* Instructions & Guidelines */}
           <button
             onClick={() => {
               setShowHelpModal(true);
@@ -234,8 +237,8 @@ export default function RRAdmin() {
             }}
             className="w-full flex items-center gap-3 px-3.5 py-2 text-xs font-semibold whitespace-nowrap text-slate-600 hover:bg-slate-50 hover:text-blue-950 rounded-xl transition-all"
           >
-            <HelpCircle size={18} className="text-slate-400 shrink-0" />
-            <span className="truncate">Help Center</span>
+            <BookOpen size={18} className="text-slate-400 shrink-0" />
+            <span className="truncate">Instructions</span>
           </button>
 
           {/* Logout */}
@@ -331,17 +334,8 @@ export default function RRAdmin() {
             </button>
           </div>
 
-          {/* Right Side: Notifications & User Profile */}
+          {/* Right Side: User Profile */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowHelpModal(true)}
-              className="p-2 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 relative transition"
-              title="Notifications & Help"
-            >
-              <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-sky-500" />
-            </button>
-
             {currentUser && (
               <div
                 onClick={() => setRole("settings")}
@@ -440,53 +434,130 @@ export default function RRAdmin() {
         </main>
       </div>
 
-      {/* Help Center Popup Modal */}
+      {/* Instructions & Guidelines Popup Modal */}
       {showHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4 text-slate-900">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
-                  <HelpCircle size={20} />
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 text-slate-900 custom-scrollbar">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5 sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-800 font-bold">
+                  <BookOpen size={22} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-blue-950">Help Center &amp; Guidelines</h3>
-                  <p className="text-xs text-slate-500">MAHLE ANAND Recognition Rules &amp; Policy</p>
+                  <h3 className="text-base sm:text-lg font-extrabold text-blue-950 tracking-tight">
+                    Instructions &amp; Policy Guidelines
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    MAHLE ANAND Recognition Process, Scoring Formula &amp; LSIP Rules
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setShowHelpModal(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition">
-                <X size={18} />
+              <button
+                onClick={() => setShowHelpModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-700 leading-relaxed">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
-                <strong className="block text-sm font-bold text-blue-950 mb-1">Monthly Reward Perks</strong>
-                <p>Each monthly award winner receives <strong>Rs 2,000 cash prize</strong> and <strong>+10 points</strong> recorded in the HR annual ledger.</p>
+            {/* Content Body */}
+            <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
+              {/* Process Flow Timeline */}
+              <div className="space-y-2">
+                <strong className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Monthly Evaluation Process (5-Step Workflow)
+                </strong>
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-950 text-xs">Step 1: Self Nomination</span>
+                      <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">1st – 7th</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Employees complete self-nomination for eligible categories, attaching citations and business impact evidence.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-950 text-xs">Step 2: HOD Review &amp; Endorsement</span>
+                      <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">8th – 9th</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      HODs review department entries and forward max 1 employee per category (max 2 categories per unit).
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-950 text-xs">Step 3: Panel Scoring</span>
+                      <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">10th – 12th</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      A 3-member revolving panel independently scores each nominee on a 0–10 numeric scale.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-950 text-xs">Step 4: Winner Announced</span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">15th of Month</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Highest average panel score nominee wins category title &amp; receives <strong>Rs 2,000 cash prize</strong>.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-950">
-                <strong className="block text-sm font-bold mb-1">Year-End LSIP Weightage (50%)</strong>
-                <p>Cumulative monthly points carry a 50% weightage toward year-end LSIP awards.</p>
+              {/* Scoring Formula Table */}
+              <div className="rounded-xl border border-slate-200/80 overflow-hidden">
+                <div className="bg-slate-100/70 px-3.5 py-2 border-b border-slate-200/80 font-bold text-xs text-blue-950">
+                  Evaluation &amp; Scoring Matrix
+                </div>
+                <div className="divide-y divide-slate-100 bg-white text-[11px]">
+                  <div className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="font-bold text-blue-950 sm:w-32">Judge Score</span>
+                    <span className="text-slate-600 flex-1">Single numeric score <strong>0–10</strong> per judge (integers or one decimal allowed).</span>
+                  </div>
+                  <div className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="font-bold text-blue-950 sm:w-32">Panel Score</span>
+                    <span className="text-slate-600 flex-1 font-mono">
+                      PanelScore = (Judge 1 + Judge 2 + Judge 3) / 3 &nbsp;<span className="text-slate-400 font-sans">(scale 0–10)</span>
+                    </span>
+                  </div>
+                  <div className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="font-bold text-blue-950 sm:w-32">Winner Selection</span>
+                    <span className="text-slate-600 flex-1">Nominee with the highest average <strong>PanelScore</strong> wins the award for the month.</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 space-y-1">
-                <strong className="block text-sm font-bold text-blue-950">Cycle Timeline Schedule</strong>
-                <ul className="list-disc pl-4 space-y-0.5 font-medium">
-                  <li>Self Nomination: 1st – 7th of Month</li>
-                  <li>HOD Review &amp; Endorsement: 8th – 9th of Month</li>
-                  <li>Panel Scoring: 10th – 12th of Month</li>
-                  <li>Winners Announced: 15th of Month</li>
-                </ul>
+              {/* Year-End LSIP Recognition Ledger Card */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 via-sky-50 to-indigo-50 border border-sky-200/80 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Calculator size={16} className="text-sky-700 shrink-0" />
+                  <strong className="text-xs font-bold text-blue-950 uppercase tracking-wider">
+                    Year-End LSIP Recognition Ledger
+                  </strong>
+                </div>
+                <p className="text-[11px] text-slate-700 font-medium leading-relaxed">
+                  We add and maintain a ledger of employee scores every month for year-end LSIP recognition awards.
+                </p>
               </div>
             </div>
 
-            <div className="pt-2 text-right">
+            {/* Footer */}
+            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+              <span className="text-[11px] font-semibold text-slate-400">
+                MAHLE ANAND Recognition Policy Guidelines
+              </span>
               <button
                 onClick={() => setShowHelpModal(false)}
                 className="rounded-xl bg-[#0A2540] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900 transition"
               >
-                Close Guidelines
+                Close Instructions
               </button>
             </div>
           </div>

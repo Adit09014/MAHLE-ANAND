@@ -70,6 +70,8 @@ export interface Cycle {
 export interface Win {
   month: string;
   category: string;
+  score?: number;
+  isWinner?: boolean;
 }
 
 export interface PointRecord {
@@ -118,3 +120,4 @@ export interface CategoryResult {
   slotLabel: string | null;
   ranked: RankedNominee[];
 }
+

@@ -128,12 +128,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // --- HOD SPECIFIC CALCULATIONS ---
   const deptWinsList = useMemo(() => {
-    const list: Array<{ name: string; categoryTitle: string; month?: string }> = [];
+    const list: Array<{ name: string; categoryTitle: string; month?: string; score?: number; isWinner?: boolean }> = [];
     Object.values(points).forEach((pRecord) => {
       if (pRecord.unit === hodUnitId && pRecord.wins) {
         pRecord.wins.forEach((w) => {
           const catName = catById(w.category)?.name || w.category;
-          list.push({ name: pRecord.name, categoryTitle: catName, month: w.month });
+          list.push({ name: pRecord.name, categoryTitle: catName, month: w.month, score: w.score, isWinner: w.isWinner });
         });
       }
     });
@@ -187,14 +187,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [isDeclared, categoryResults, userCode, userName]);
 
   const allTitlesWon = useMemo(() => {
-    const titles: Array<{ month?: string; categoryTitle: string }> = [];
+    const titles: Array<{ month?: string; categoryTitle: string; score?: number; isWinner?: boolean }> = [];
     userWinsList.forEach((w) => {
       const catName = catById(w.category)?.name || w.category;
-      titles.push({ month: w.month, categoryTitle: catName });
+      titles.push({ month: w.month, categoryTitle: catName, score: w.score, isWinner: w.isWinner });
     });
     activeCycleWins.forEach((wTitle) => {
       if (!titles.some((t) => t.categoryTitle === wTitle && t.month === cycle.month)) {
-        titles.push({ month: cycle.month, categoryTitle: wTitle });
+        titles.push({ month: cycle.month, categoryTitle: wTitle, isWinner: true });
       }
     });
     return titles;
@@ -848,308 +848,300 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </Card>
         </div>
       ) : isHod ? (
-        /* HOD SPECIFIC APPLIED NOMINATIONS & DEPT WINS SHOWCASE */
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
-              <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
-                    <History size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-blue-950">
-                      Department Applied Nominations
-                    </h3>
-                    <p className="text-xs text-blue-900/60">
-                      Nominations submitted by employees in {hodUnitObj?.name || hodUnitId} for active evaluation.
-                    </p>
-                  </div>
+        /* HOD SPECIFIC APPLIED NOMINATIONS & DEPT WINS SHOWCASE (Stacked Up-Down) */
+        <div className="space-y-6 flex flex-col">
+          <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
+                  <History size={18} />
                 </div>
-                <button
-                  onClick={onNavigateToEndorse || onNavigateToNominate}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/15 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-100 transition"
-                >
-                  <ShieldCheck size={14} /> Manage Endorsements
-                </button>
+                <div>
+                  <h3 className="text-base font-bold text-blue-950">
+                    Department Applied Nominations
+                  </h3>
+                  <p className="text-xs text-blue-900/60">
+                    Nominations submitted by employees in {hodUnitObj?.name || hodUnitId} for active evaluation.
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={onNavigateToEndorse || onNavigateToNominate}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/15 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-100 transition"
+              >
+                <ShieldCheck size={14} /> Manage Endorsements
+              </button>
+            </div>
 
-              {deptNominations.length === 0 ? (
-                <div className="py-12 px-4 text-center space-y-3">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-900/40">
-                    <History size={24} />
+            {deptNominations.length === 0 ? (
+              <div className="py-12 px-4 text-center space-y-3">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-900/40">
+                  <History size={24} />
+                </div>
+                <h4 className="text-sm font-bold text-blue-950">
+                  No department entries submitted yet
+                </h4>
+                <p className="text-xs text-blue-900/60 max-w-sm mx-auto">
+                  Employees in your department have not applied for nominations in this cycle yet.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {deptNominations.map((nom) => {
+                  const cat = catById(nom.category);
+                  const isEndorsed = usedPicks[nom.category] === nom.id;
+
+                  return (
+                    <div
+                      key={nom.id}
+                      className="rounded-xl border border-blue-900/10 bg-blue-950/[0.01] p-4 hover:border-blue-900/20 transition duration-150 space-y-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/5 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-900 uppercase">
+                            {cat?.name || nom.category}
+                          </span>
+                          <h4 className="text-sm font-bold text-blue-950">
+                            {nom.name}
+                          </h4>
+                          <span className="text-xs font-mono text-blue-900/50">
+                            ({nom.code})
+                          </span>
+                        </div>
+                        <div>
+                          {isEndorsed ? (
+                            <Pill tone="good">
+                              <CheckCircle2 size={11} className="inline mr-1" /> HOD Endorsed
+                            </Pill>
+                          ) : (
+                            <Pill tone="warn">Pending Endorsement</Pill>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
+                        &ldquo;{nom.citation}&rdquo;
+                      </p>
+
+                      <div className="flex items-center justify-between text-[11px] font-mono text-blue-900/50 pt-1">
+                        <span>Unit: {hodUnitObj?.name || nom.unit}</span>
+                        <span>Submitted: {new Date(nom.submittedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
+              <div className="flex items-center gap-2">
+                <Trophy size={18} className="text-amber-500" />
+                <h3 className="text-base font-bold text-blue-950">
+                  Dept Wins History
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900/50">
+                {hodUnitObj?.name || hodUnitId}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {deptWinsList.length === 0 ? (
+                <div className="text-center py-8 px-2 text-xs text-blue-900/60 space-y-2">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                    <Trophy size={20} />
                   </div>
-                  <h4 className="text-sm font-bold text-blue-950">
-                    No department entries submitted yet
-                  </h4>
-                  <p className="text-xs text-blue-900/60 max-w-sm mx-auto">
-                    Employees in your department have not applied for nominations in this cycle yet.
+                  <p className="font-semibold text-blue-950">No Wins Recorded Yet</p>
+                  <p className="text-[11px] text-blue-900/50 leading-relaxed">
+                    Department wins are listed here when official results are declared by Admin.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {deptNominations.map((nom) => {
-                    const cat = catById(nom.category);
-                    const isEndorsed = usedPicks[nom.category] === nom.id;
-
-                    return (
-                      <div
-                        key={nom.id}
-                        className="rounded-xl border border-blue-900/10 bg-blue-950/[0.01] p-4 hover:border-blue-900/20 transition duration-150 space-y-3"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/5 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-900 uppercase">
-                              {cat?.name || nom.category}
-                            </span>
-                            <h4 className="text-sm font-bold text-blue-950">
-                              {nom.name}
-                            </h4>
-                            <span className="text-xs font-mono text-blue-900/50">
-                              ({nom.code})
-                            </span>
-                          </div>
-                          <div>
-                            {isEndorsed ? (
-                              <Pill tone="good">
-                                <CheckCircle2 size={11} className="inline mr-1" /> HOD Endorsed
-                              </Pill>
-                            ) : (
-                              <Pill tone="warn">Pending Endorsement</Pill>
-                            )}
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
-                          &ldquo;{nom.citation}&rdquo;
-                        </p>
-
-                        <div className="flex items-center justify-between text-[11px] font-mono text-blue-900/50 pt-1">
-                          <span>Unit: {hodUnitObj?.name || nom.unit}</span>
-                          <span>Submitted: {new Date(nom.submittedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
-                        </div>
+                deptWinsList.map((item, idx) => (
+                  <div
+                    key={`${item.name}-${idx}`}
+                    className="flex items-center justify-between p-3 rounded-xl border border-amber-200/60 bg-amber-50/40 hover:bg-amber-50/80 transition"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/20 text-amber-700">
+                        <Trophy size={16} />
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
-              <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Trophy size={18} className="text-amber-500" />
-                  <h3 className="text-base font-bold text-blue-950">
-                    Dept Wins History
-                  </h3>
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900/50">
-                  {hodUnitObj?.name || hodUnitId}
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {deptWinsList.length === 0 ? (
-                  <div className="text-center py-8 px-2 text-xs text-blue-900/60 space-y-2">
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-                      <Trophy size={20} />
+                      <div>
+                        <strong className="block text-xs font-bold text-blue-950">
+                          {item.name}
+                        </strong>
+                        <span className="text-[10px] font-medium text-slate-500">
+                          {item.categoryTitle}
+                        </span>
+                      </div>
                     </div>
-                    <p className="font-semibold text-blue-950">No Wins Recorded Yet</p>
-                    <p className="text-[11px] text-blue-900/50 leading-relaxed">
-                      Department wins are listed here when official results are declared by Admin.
-                    </p>
+                    <span className="rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase border border-amber-300/40">
+                      +{item.score !== undefined ? item.score.toFixed(1) : POINTS} Pts
+                    </span>
                   </div>
-                ) : (
-                  deptWinsList.map((item, idx) => (
-                    <div
-                      key={`${item.name}-${idx}`}
-                      className="flex items-center justify-between p-3 rounded-xl border border-amber-200/60 bg-amber-50/40 hover:bg-amber-50/80 transition"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/20 text-amber-700">
-                          <Trophy size={16} />
-                        </div>
-                        <div>
-                          <strong className="block text-xs font-bold text-blue-950">
-                            {item.name}
-                          </strong>
-                          <span className="text-[10px] font-medium text-slate-500">
-                            {item.categoryTitle}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase border border-amber-300/40">
-                        +{POINTS} Pts
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-          </div>
+                ))
+              )}
+            </div>
+          </Card>
         </div>
       ) : (
-        /* EMPLOYEE SPECIFIC APPLIED NOMINATIONS & TITLES WON */
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
-              <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
-                    <History size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-blue-950">
-                      My Applied Awards &amp; Activity
-                    </h3>
-                    <p className="text-xs text-blue-900/60">
-                      Status of nominations submitted by you in the current cycle.
-                    </p>
-                  </div>
+        /* EMPLOYEE SPECIFIC APPLIED NOMINATIONS & TITLES WON (Stacked Up-Down) */
+        <div className="space-y-6 flex flex-col">
+          <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
+                  <History size={18} />
                 </div>
-                <button
-                  onClick={onNavigateToNominate}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/15 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-100 transition"
-                >
-                  <PlusCircle size={14} /> New Entry
-                </button>
-              </div>
-
-              {userNominations.length === 0 ? (
-                <div className="py-12 px-4 text-center space-y-4">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-900/40">
-                    <History size={28} />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-1">
-                    <h4 className="text-base font-bold text-blue-950">
-                      No recent activity
-                    </h4>
-                    <p className="text-xs text-blue-900/60 leading-relaxed">
-                      You have not submitted a nomination in the active recognition cycle yet. Nominate yourself or a colleague to participate in this month&apos;s recognition awards.
-                    </p>
-                  </div>
-                  <div>
-                    <button
-                      onClick={onNavigateToNominate}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#0A2540] px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition-all"
-                    >
-                      New Nomination
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {userNominations.map((nom) => {
-                    const cat = catById(nom.category);
-                    const isEndorsed = cycle.endorsed[nom.unit]?.[nom.category] === nom.id;
-
-                    return (
-                      <div
-                        key={nom.id}
-                        className="rounded-xl border border-blue-900/10 bg-blue-950/[0.01] p-4 hover:border-blue-900/20 transition duration-150 space-y-3"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/5 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-900 uppercase">
-                              {cat?.name || nom.category}
-                            </span>
-                            <h4 className="text-sm font-bold text-blue-950">
-                              {nom.name}
-                            </h4>
-                            <span className="text-xs font-mono text-blue-900/50">
-                              ({nom.code})
-                            </span>
-                          </div>
-                          <div>
-                            {isEndorsed ? (
-                              <Pill tone="good">
-                                <CheckCircle2 size={11} className="inline mr-1" /> HOD Endorsed
-                              </Pill>
-                            ) : nom.validated === false ? (
-                              <Pill tone="warn">Under HR Review</Pill>
-                            ) : (
-                              <Pill tone="muted">Submission Received</Pill>
-                            )}
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
-                          &ldquo;{nom.citation}&rdquo;
-                        </p>
-
-                        <div className="flex items-center justify-between text-[11px] font-mono text-blue-900/50 pt-1">
-                          <span>Unit: {unitById(nom.unit)?.name || nom.unit}</span>
-                          <span>Submitted: {new Date(nom.submittedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
-              <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Award size={18} className="text-amber-500" />
+                <div>
                   <h3 className="text-base font-bold text-blue-950">
-                    My Awards &amp; Titles Won
+                    My Applied Awards &amp; Activity
                   </h3>
+                  <p className="text-xs text-blue-900/60">
+                    Status of nominations submitted by you in the current cycle.
+                  </p>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900/50">
-                  Titles
-                </span>
               </div>
+              <button
+                onClick={onNavigateToNominate}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/15 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-100 transition"
+              >
+                <PlusCircle size={14} /> New Entry
+              </button>
+            </div>
 
+            {userNominations.length === 0 ? (
+              <div className="py-12 px-4 text-center space-y-4">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-900/40">
+                  <History size={28} />
+                </div>
+                <div className="max-w-md mx-auto space-y-1">
+                  <h4 className="text-base font-bold text-blue-950">
+                    No recent activity
+                  </h4>
+                  <p className="text-xs text-blue-900/60 leading-relaxed">
+                    You have not submitted a nomination in the active recognition cycle yet. Nominate yourself or a colleague to participate in this month&apos;s recognition awards.
+                  </p>
+                </div>
+                <div>
+                  <button
+                    onClick={onNavigateToNominate}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#0A2540] px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-blue-900 active:scale-95 transition-all"
+                  >
+                    New Nomination
+                  </button>
+                </div>
+              </div>
+            ) : (
               <div className="space-y-3">
-                {allTitlesWon.length === 0 ? (
-                  <div className="text-center py-8 px-2 text-xs text-blue-900/60 space-y-2">
-                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-                      <Trophy size={20} />
-                    </div>
-                    <p className="font-semibold text-blue-950">No Awards Won Yet</p>
-                    <p className="text-[11px] text-blue-900/50 leading-relaxed">
-                      Participate in active recognition cycles. Winning an award earns <strong>+{POINTS} points</strong> toward year-end LSIP awards!
-                    </p>
-                  </div>
-                ) : (
-                  allTitlesWon.map((item, idx) => (
+                {userNominations.map((nom) => {
+                  const cat = catById(nom.category);
+                  const isEndorsed = cycle.endorsed[nom.unit]?.[nom.category] === nom.id;
+
+                  return (
                     <div
-                      key={`${item.categoryTitle}-${idx}`}
-                      className="flex items-center justify-between p-3 rounded-xl border border-amber-200/60 bg-amber-50/40 hover:bg-amber-50/80 transition"
+                      key={nom.id}
+                      className="rounded-xl border border-blue-900/10 bg-blue-950/[0.01] p-4 hover:border-blue-900/20 transition duration-150 space-y-3"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/20 text-amber-700">
-                          <Trophy size={16} />
-                        </div>
-                        <div>
-                          <strong className="block text-xs font-bold text-blue-950">
-                            {item.categoryTitle}
-                          </strong>
-                          <span className="text-[10px] font-mono text-blue-900/50">
-                            {item.month ? `Cycle: ${item.month}` : "Official Winner"}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/5 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-900 uppercase">
+                            {cat?.name || nom.category}
+                          </span>
+                          <h4 className="text-sm font-bold text-blue-950">
+                            {nom.name}
+                          </h4>
+                          <span className="text-xs font-mono text-blue-900/50">
+                            ({nom.code})
                           </span>
                         </div>
+                        <div>
+                          {isEndorsed ? (
+                            <Pill tone="good">
+                              <CheckCircle2 size={11} className="inline mr-1" /> HOD Endorsed
+                            </Pill>
+                          ) : nom.validated === false ? (
+                            <Pill tone="warn">Under HR Review</Pill>
+                          ) : (
+                            <Pill tone="muted">Submission Received</Pill>
+                          )}
+                        </div>
                       </div>
-                      <span className="rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase border border-amber-300/40">
-                        +{POINTS} Pts
-                      </span>
-                    </div>
-                  ))
-                )}
 
-                <div className="pt-2 border-t border-blue-900/5 text-center">
-                  <span className="text-[11px] text-blue-900/60">
-                    Cumulative Points Balance: <strong>{userCumulativePoints} Pts</strong>
-                  </span>
-                </div>
+                      <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
+                        &ldquo;{nom.citation}&rdquo;
+                      </p>
+
+                      <div className="flex items-center justify-between text-[11px] font-mono text-blue-900/50 pt-1">
+                        <span>Unit: {unitById(nom.unit)?.name || nom.unit}</span>
+                        <span>Submitted: {new Date(nom.submittedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </Card>
-          </div>
+            )}
+          </Card>
+
+          <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
+              <div className="flex items-center gap-2">
+                <Award size={18} className="text-amber-500" />
+                <h3 className="text-base font-bold text-blue-950">
+                  My Awards &amp; Titles Won
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-900/50">
+                Titles
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {allTitlesWon.length === 0 ? (
+                <div className="text-center py-8 px-2 text-xs text-blue-900/60 space-y-2">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                    <Trophy size={20} />
+                  </div>
+                  <p className="font-semibold text-blue-950">No Awards Won Yet</p>
+                  <p className="text-[11px] text-blue-900/50 leading-relaxed">
+                    Participate in active recognition cycles. Winning an award earns <strong>+{POINTS} points</strong> toward year-end LSIP awards!
+                  </p>
+                </div>
+              ) : (
+                allTitlesWon.map((item, idx) => (
+                  <div
+                    key={`${item.categoryTitle}-${idx}`}
+                    className="flex items-center justify-between p-3 rounded-xl border border-amber-200/60 bg-amber-50/40 hover:bg-amber-50/80 transition"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/20 text-amber-700">
+                        <Trophy size={16} />
+                      </div>
+                      <div>
+                        <strong className="block text-xs font-bold text-blue-950">
+                          {item.categoryTitle}
+                        </strong>
+                        <span className="text-[10px] font-mono text-blue-900/50">
+                          {item.month ? `Cycle: ${item.month}` : "Official Winner"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase border border-amber-300/40">
+                      +{item.score !== undefined ? item.score.toFixed(1) : POINTS} Pts
+                    </span>
+                  </div>
+                ))
+              )}
+
+              <div className="pt-2 border-t border-blue-900/5 text-center">
+                <span className="text-[11px] text-blue-900/60">
+                  Cumulative Points Balance: <strong>{userCumulativePoints} Pts</strong>
+                </span>
+              </div>
+            </div>
+          </Card>
         </div>
       )}
     </div>
