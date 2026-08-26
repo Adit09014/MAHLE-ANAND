@@ -25,7 +25,6 @@ BEGIN
         Designation     NVARCHAR(100)   NULL,
         CONSTRAINT PK_Employees PRIMARY KEY (Emp_No)
     );
-
     PRINT 'Created table: dbo.Employees';
 END
 ELSE
@@ -35,8 +34,12 @@ END
 GO
 
 -- ============================================================
--- TABLE 2: EmpRoles  (App-specific: role & panel judge flags)
--- Stores which employees are HR, HOD, Panel Judges, etc.
+-- TABLE 2: EmpRoles  (App-specific: role, HOD flag & panel judge)
+--
+-- IsHOD  = 1 means this employee is Head of their Department.
+--           HR Admin sets this manually — NOT auto-derived from Designation.
+-- Role   = 'hr' | 'hod' | 'employee' | 'judge'
+--           When IsHOD = 1 AND Role = 'employee', login treats user as 'hod'.
 -- ============================================================
 IF NOT EXISTS (
     SELECT 1 FROM INFORMATION_SCHEMA.TABLES
@@ -47,7 +50,10 @@ BEGIN
         Emp_No          NVARCHAR(20)    NOT NULL,
         Role            NVARCHAR(20)    NOT NULL DEFAULT 'employee',
             -- Allowed values: 'employee' | 'hod' | 'hr' | 'judge'
+        IsHOD           BIT             NOT NULL DEFAULT 0,
+            -- 1 = Head of Department (set by HR Admin per department)
         IsPanelJudge    BIT             NOT NULL DEFAULT 0,
+            -- 1 = Eligible for monthly panel scoring committee
         Gender          NVARCHAR(10)    NULL,
         UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
         CONSTRAINT PK_EmpRoles PRIMARY KEY (Emp_No),
@@ -55,19 +61,30 @@ BEGIN
             FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
             ON DELETE CASCADE
     );
-
     PRINT 'Created table: dbo.EmpRoles';
 END
 ELSE
 BEGIN
-    PRINT 'Skipped: dbo.EmpRoles already exists';
+    -- If table already exists, add IsHOD column if missing
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'EmpRoles' AND COLUMN_NAME = 'IsHOD'
+    )
+    BEGIN
+        ALTER TABLE dbo.EmpRoles ADD IsHOD BIT NOT NULL DEFAULT 0;
+        PRINT 'Added column IsHOD to existing dbo.EmpRoles';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Skipped: dbo.EmpRoles + IsHOD column already exist';
+    END
 END
 GO
 
 -- ============================================================
 -- TABLE 3: EmpPasswords  (Custom password hashes — SHA-256)
--- Only exists for employees who changed their default password.
--- If no row exists → app falls back to default password formula.
+-- Only one row per employee who changed their default password.
+-- No row = app uses default formula: last4(Emp_No) + first4(DisplayName)
 -- ============================================================
 IF NOT EXISTS (
     SELECT 1 FROM INFORMATION_SCHEMA.TABLES
@@ -76,14 +93,13 @@ IF NOT EXISTS (
 BEGIN
     CREATE TABLE dbo.EmpPasswords (
         Emp_No          NVARCHAR(20)    NOT NULL,
-        PasswordHash    NVARCHAR(64)    NOT NULL,   -- SHA-256 hex string (64 chars)
+        PasswordHash    NVARCHAR(64)    NOT NULL,   -- SHA-256 hex (64 chars)
         UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
         CONSTRAINT PK_EmpPasswords PRIMARY KEY (Emp_No),
         CONSTRAINT FK_EmpPasswords_Employees
             FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
             ON DELETE CASCADE
     );
-
     PRINT 'Created table: dbo.EmpPasswords';
 END
 ELSE
@@ -93,10 +109,14 @@ END
 GO
 
 -- ============================================================
--- INDEXES (for faster lookups)
+-- INDEXES
 -- ============================================================
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_EmpRoles_Role')
     CREATE INDEX IX_EmpRoles_Role ON dbo.EmpRoles (Role);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_EmpRoles_IsHOD')
+    CREATE INDEX IX_EmpRoles_IsHOD ON dbo.EmpRoles (IsHOD);
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employees_Department')
@@ -107,32 +127,52 @@ PRINT 'Indexes created.';
 GO
 
 -- ============================================================
--- VERIFY — Check all tables were created
+-- VERIFY — Check all tables and columns
 -- ============================================================
 SELECT
-    TABLE_NAME,
-    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS c
-     WHERE c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = 'dbo') AS ColumnCount
+    t.TABLE_NAME,
+    c.COLUMN_NAME,
+    c.DATA_TYPE,
+    c.CHARACTER_MAXIMUM_LENGTH,
+    c.COLUMN_DEFAULT,
+    c.IS_NULLABLE
 FROM INFORMATION_SCHEMA.TABLES t
-WHERE TABLE_SCHEMA = 'dbo'
-  AND TABLE_NAME IN ('Employees', 'EmpRoles', 'EmpPasswords')
-ORDER BY TABLE_NAME;
+JOIN INFORMATION_SCHEMA.COLUMNS c
+    ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = 'dbo'
+WHERE t.TABLE_SCHEMA = 'dbo'
+  AND t.TABLE_NAME IN ('Employees', 'EmpRoles', 'EmpPasswords')
+ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION;
 GO
 
 -- ============================================================
--- INITIAL DATA — Assign first HR Admin
--- Replace M1001 with your actual Emp_No
+-- INITIAL DATA — Assign first HR Admin + HODs
+-- Uncomment and edit Emp_No values before running.
 -- ============================================================
+
 /*
+-- 1. Assign HR Admin role
 MERGE dbo.EmpRoles AS target
-USING (VALUES ('M1001', 'hr', 0)) AS source (Emp_No, Role, IsPanelJudge)
+USING (VALUES ('M1001', 'hr', 0, 0)) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
 ON target.Emp_No = source.Emp_No
 WHEN MATCHED THEN
-    UPDATE SET Role = source.Role, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+    UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
 WHEN NOT MATCHED THEN
-    INSERT (Emp_No, Role, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsPanelJudge);
+    INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
+
+-- 2. Assign HODs per department (IsHOD = 1, Role = 'hod')
+MERGE dbo.EmpRoles AS target
+USING (
+    VALUES
+        ('M1002', 'hod', 1, 0),   -- HOD for Dept A
+        ('M1003', 'hod', 1, 0),   -- HOD for Dept B
+        ('M1004', 'hod', 1, 0)    -- HOD for Dept C
+) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
+ON target.Emp_No = source.Emp_No
+WHEN MATCHED THEN
+    UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+WHEN NOT MATCHED THEN
+    INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
 */
--- ↑ Uncomment the block above and replace 'M1001' with your HR Admin's Emp_No, then run.
 
 PRINT '=== Schema setup complete ===';
 GO
