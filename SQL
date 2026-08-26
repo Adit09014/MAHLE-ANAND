@@ -176,3 +176,32 @@ WHEN NOT MATCHED THEN
 
 PRINT '=== Schema setup complete ===';
 GO
+
+
+
+ENV CODE
+
+# ─── App Settings ────────────────────────────────────────────────────────────
+HR_MASTER_PASSWORD=mahle123
+
+# ─── SQL Server (SSMS) — Employee Directory ──────────────────────────────────
+# Server name or IP (e.g. DESKTOP-ABC\SQLEXPRESS  or  192.168.1.10)
+MSSQL_SERVER=YOUR_SERVER_NAME
+
+# Database name that contains the employee table
+MSSQL_DATABASE=YOUR_DATABASE_NAME
+
+# Set to "true" to use Windows Authentication (trusted connection)
+# Set to "false" to use SQL Server username/password authentication
+MSSQL_TRUSTED_CONNECTION=false
+
+# Only needed when MSSQL_TRUSTED_CONNECTION=false
+MSSQL_USER=YOUR_SQL_USERNAME
+MSSQL_PASSWORD=YOUR_SQL_PASSWORD
+
+# Set to "true" if connecting to Azure SQL or a server that requires TLS
+MSSQL_ENCRYPT=false
+
+# Exact schema-qualified table/view name (e.g. dbo.Employees)
+MSSQL_TABLE=dbo.Employees
+
