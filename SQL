@@ -1,7 +1,6 @@
 -- ============================================================
---  PROJECT AWARD — Full Database Schema
+--  PROJECT AWARD — Full Database Schema (100% SQL Server)
 --  Run this script in SSMS on your company database
---  Execute in order: Tables → Indexes → Initial Data
 -- ============================================================
 
 USE [YourDatabaseName];   -- ← CHANGE THIS to your actual database name
@@ -9,7 +8,6 @@ GO
 
 -- ============================================================
 -- TABLE 1: Employees  (HR Master Directory — READ ONLY for app)
--- If this table already exists with your HR data, SKIP this block.
 -- ============================================================
 IF NOT EXISTS (
     SELECT 1 FROM INFORMATION_SCHEMA.TABLES
@@ -27,19 +25,10 @@ BEGIN
     );
     PRINT 'Created table: dbo.Employees';
 END
-ELSE
-BEGIN
-    PRINT 'Skipped: dbo.Employees already exists';
-END
 GO
 
 -- ============================================================
 -- TABLE 2: EmpRoles  (App-specific: role, HOD flag & panel judge)
---
--- IsHOD  = 1 means this employee is Head of their Department.
---           HR Admin sets this manually — NOT auto-derived from Designation.
--- Role   = 'hr' | 'hod' | 'employee' | 'judge'
---           When IsHOD = 1 AND Role = 'employee', login treats user as 'hod'.
 -- ============================================================
 IF NOT EXISTS (
     SELECT 1 FROM INFORMATION_SCHEMA.TABLES
@@ -49,11 +38,8 @@ BEGIN
     CREATE TABLE dbo.EmpRoles (
         Emp_No          NVARCHAR(20)    NOT NULL,
         Role            NVARCHAR(20)    NOT NULL DEFAULT 'employee',
-            -- Allowed values: 'employee' | 'hod' | 'hr' | 'judge'
         IsHOD           BIT             NOT NULL DEFAULT 0,
-            -- 1 = Head of Department (set by HR Admin per department)
         IsPanelJudge    BIT             NOT NULL DEFAULT 0,
-            -- 1 = Eligible for monthly panel scoring committee
         Gender          NVARCHAR(10)    NULL,
         UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
         CONSTRAINT PK_EmpRoles PRIMARY KEY (Emp_No),
@@ -65,7 +51,6 @@ BEGIN
 END
 ELSE
 BEGIN
-    -- If table already exists, add IsHOD column if missing
     IF NOT EXISTS (
         SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'EmpRoles' AND COLUMN_NAME = 'IsHOD'
@@ -74,17 +59,11 @@ BEGIN
         ALTER TABLE dbo.EmpRoles ADD IsHOD BIT NOT NULL DEFAULT 0;
         PRINT 'Added column IsHOD to existing dbo.EmpRoles';
     END
-    ELSE
-    BEGIN
-        PRINT 'Skipped: dbo.EmpRoles + IsHOD column already exist';
-    END
 END
 GO
 
 -- ============================================================
 -- TABLE 3: EmpPasswords  (Custom password hashes — SHA-256)
--- Only one row per employee who changed their default password.
--- No row = app uses default formula: last4(Emp_No) + first4(DisplayName)
 -- ============================================================
 IF NOT EXISTS (
     SELECT 1 FROM INFORMATION_SCHEMA.TABLES
@@ -93,7 +72,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE TABLE dbo.EmpPasswords (
         Emp_No          NVARCHAR(20)    NOT NULL,
-        PasswordHash    NVARCHAR(64)    NOT NULL,   -- SHA-256 hex (64 chars)
+        PasswordHash    NVARCHAR(64)    NOT NULL,
         UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
         CONSTRAINT PK_EmpPasswords PRIMARY KEY (Emp_No),
         CONSTRAINT FK_EmpPasswords_Employees
@@ -102,9 +81,59 @@ BEGIN
     );
     PRINT 'Created table: dbo.EmpPasswords';
 END
-ELSE
+GO
+
+-- ============================================================
+-- TABLE 4: Cycles  (Monthly Nominations, Endorsements, Scores)
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Cycles'
+)
 BEGIN
-    PRINT 'Skipped: dbo.EmpPasswords already exists';
+    CREATE TABLE dbo.Cycles (
+        Month           NVARCHAR(10)    NOT NULL,   -- e.g. '2026-08'
+        DataJSON        NVARCHAR(MAX)   NOT NULL,   -- Complete cycle state in JSON
+        UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT PK_Cycles PRIMARY KEY (Month)
+    );
+    PRINT 'Created table: dbo.Cycles';
+END
+GO
+
+-- ============================================================
+-- TABLE 5: Points  (Annual R&R / LSIP Ledger)
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Points'
+)
+BEGIN
+    CREATE TABLE dbo.Points (
+        KeyName         NVARCHAR(50)    NOT NULL,   -- e.g. 'annual_ledger'
+        DataJSON        NVARCHAR(MAX)   NOT NULL,   -- Complete ledger in JSON
+        UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT PK_Points PRIMARY KEY (KeyName)
+    );
+    PRINT 'Created table: dbo.Points';
+END
+GO
+
+-- ============================================================
+-- TABLE 6: Branding  (App Header Logo & Customization)
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Branding'
+)
+BEGIN
+    CREATE TABLE dbo.Branding (
+        KeyName         NVARCHAR(50)    NOT NULL,   -- e.g. 'header_logo'
+        LogoUrl         NVARCHAR(MAX)   NOT NULL,
+        UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT PK_Branding PRIMARY KEY (KeyName)
+    );
+    PRINT 'Created table: dbo.Branding';
 END
 GO
 
@@ -123,112 +152,61 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employees_Department')
     CREATE INDEX IX_Employees_Department ON dbo.Employees (Department);
 GO
 
-PRINT 'Indexes created.';
+PRINT '=== Schema setup complete (6 tables ready) ===';
 GO
 
--- ============================================================
--- VERIFY — Check all tables and columns
--- ============================================================
-SELECT
-    t.TABLE_NAME,
-    c.COLUMN_NAME,
-    c.DATA_TYPE,
-    c.CHARACTER_MAXIMUM_LENGTH,
-    c.COLUMN_DEFAULT,
-    c.IS_NULLABLE
-FROM INFORMATION_SCHEMA.TABLES t
-JOIN INFORMATION_SCHEMA.COLUMNS c
-    ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = 'dbo'
-WHERE t.TABLE_SCHEMA = 'dbo'
-  AND t.TABLE_NAME IN ('Employees', 'EmpRoles', 'EmpPasswords')
-ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION;
+# ─── App Settings ────────────────────────────────────────────────────────────
+HR_MASTER_PASSWORD=adminmahle1234
+
+# ─── SQL Server (SSMS) — 100% Database Provider ─────────────────────────────
+MSSQL_SERVER=INGG-MARUTIAPP\SQLEXPRESS
+MSSQL_DATABASE=Rewards
+MSSQL_TRUSTED_CONNECTION=true
+MSSQL_ENCRYPT=false
+MSSQL_TABLE=dbo.Employees
+
+
+#SQL
+USE [Rewards];
 GO
 
--- ============================================================
--- INITIAL DATA — Assign first HR Admin + HODs
--- Uncomment and edit Emp_No values before running.
--- ============================================================
+-- 1. Insert 3 Employees
+IF NOT EXISTS (SELECT 1 FROM dbo.Employees WHERE Emp_No = 'M1001')
+    INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+    VALUES ('M1001', 'Aditya Kumar', 'aditya.kumar@mahle.com', 'hr', 'Gurgaon', 'HR Manager');
 
-/*
--- 1. Assign HR Admin role
-MERGE dbo.EmpRoles AS target
-USING (VALUES ('M1001', 'hr', 0, 0)) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
-ON target.Emp_No = source.Emp_No
-WHEN MATCHED THEN
-    UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
-WHEN NOT MATCHED THEN
-    INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
+IF NOT EXISTS (SELECT 1 FROM dbo.Employees WHERE Emp_No = 'M1002')
+    INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+    VALUES ('M1002', 'Vikram Singh', 'vikram.singh@mahle.com', 'rnd', 'Gurgaon', 'R&D Manager');
 
--- 2. Assign HODs per department (IsHOD = 1, Role = 'hod')
+IF NOT EXISTS (SELECT 1 FROM dbo.Employees WHERE Emp_No = 'M1003')
+    INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+    VALUES ('M1003', 'Priya Sharma', 'priya.sharma@mahle.com', 'fin', 'Gurgaon', 'Finance Executive');
+GO
+
+-- 2. Assign Roles (1 HR Admin, 1 HOD, 1 Employee)
 MERGE dbo.EmpRoles AS target
 USING (
-    VALUES
-        ('M1002', 'hod', 1, 0),   -- HOD for Dept A
-        ('M1003', 'hod', 1, 0),   -- HOD for Dept B
-        ('M1004', 'hod', 1, 0)    -- HOD for Dept C
+    VALUES 
+        ('M1001', 'hr',  0, 0),     -- M1001: HR Admin
+        ('M1002', 'hod', 1, 1),     -- M1002: HOD (R&D) + Panel Judge
+        ('M1003', 'employee', 0, 0) -- M1003: Staff Member
 ) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
 ON target.Emp_No = source.Emp_No
 WHEN MATCHED THEN
     UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
 WHEN NOT MATCHED THEN
     INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
-*/
-
-PRINT '=== Schema setup complete ===';
 GO
 
-
-
-ENV CODE
-
-# ─── App Settings ────────────────────────────────────────────────────────────
-HR_MASTER_PASSWORD=mahle123
-
-# ─── SQL Server (SSMS) — Employee Directory ──────────────────────────────────
-# Server name or IP (e.g. DESKTOP-ABC\SQLEXPRESS  or  192.168.1.10)
-MSSQL_SERVER=YOUR_SERVER_NAME
-
-# Database name that contains the employee table
-MSSQL_DATABASE=YOUR_DATABASE_NAME
-
-# Set to "true" to use Windows Authentication (trusted connection)
-# Set to "false" to use SQL Server username/password authentication
-MSSQL_TRUSTED_CONNECTION=false
-
-# Only needed when MSSQL_TRUSTED_CONNECTION=false
-MSSQL_USER=YOUR_SQL_USERNAME
-MSSQL_PASSWORD=YOUR_SQL_PASSWORD
-
-# Set to "true" if connecting to Azure SQL or a server that requires TLS
-MSSQL_ENCRYPT=false
-
-# Exact schema-qualified table/view name (e.g. dbo.Employees)
-MSSQL_TABLE=dbo.Employees
-
-
-INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
-VALUES
-('M1001', 'Aditya Kumar',  'aditya.kumar@mahle.com',  'hr',    'Gurgaon', 'HR Manager'),
-('M1002', 'Vikram Singh',  'vikram.singh@mahle.com',  'rnd',   'Gurgaon', 'R&D Manager'),
-('M1003', 'Priya Sharma',  'priya.sharma@mahle.com',  'fin',   'Gurgaon', 'Finance Executive');
-GO
-
--- ── Assign Roles ──────────────────────────────────────────────
-INSERT INTO dbo.EmpRoles (Emp_No, Role, IsHOD, IsPanelJudge)
-VALUES
-('M1001', 'hr',  0, 0),   -- HR Admin
-('M1002', 'hod', 1, 1);   -- HOD + Panel Judge (M1003 is plain employee, no row needed)
-GO
-
--- ── Verify + Show Passwords ───────────────────────────────────
+-- 3. Verify & Display Credentials
 SELECT
-    e.Emp_No,
-    e.DisplayName,
-    e.Department,
-    ISNULL(r.Role, 'employee')  AS AppRole,
-    ISNULL(r.IsHOD, 0)         AS IsHOD,
-    ISNULL(r.IsPanelJudge, 0)  AS IsPanelJudge,
-    RIGHT(e.Emp_No, 4) + LEFT(REPLACE(e.DisplayName, ' ', ''), 4) AS DefaultPassword
+    e.Emp_No                        AS [Employee_Code],
+    e.DisplayName                   AS [Full_Name],
+    ISNULL(r.Role, 'employee')      AS [Portal_Role],
+    RIGHT(e.Emp_No, 4) + LEFT(REPLACE(e.DisplayName, ' ', ''), 4) AS [Default_Password]
 FROM dbo.Employees e
 LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
-ORDER BY e.Emp_No;
+WHERE e.Emp_No IN ('M1001', 'M1002', 'M1003');
+GO
+
