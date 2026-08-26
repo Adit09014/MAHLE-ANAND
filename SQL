@@ -154,3 +154,14 @@ GO
 
 PRINT '=== Schema setup complete (6 tables ready) ===';
 GO
+
+# ─── App Settings ────────────────────────────────────────────────────────────
+HR_MASTER_PASSWORD=adminmahle1234
+
+# ─── SQL Server (SSMS) — 100% Database Provider ─────────────────────────────
+MSSQL_SERVER=INGG-MARUTIAPP\SQLEXPRESS
+MSSQL_DATABASE=Rewards
+MSSQL_TRUSTED_CONNECTION=true
+MSSQL_ENCRYPT=false
+MSSQL_TABLE=dbo.Employees
+
