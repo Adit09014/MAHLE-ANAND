@@ -176,3 +176,59 @@ WHEN NOT MATCHED THEN
 
 PRINT '=== Schema setup complete ===';
 GO
+
+
+
+ENV CODE
+
+# ─── App Settings ────────────────────────────────────────────────────────────
+HR_MASTER_PASSWORD=mahle123
+
+# ─── SQL Server (SSMS) — Employee Directory ──────────────────────────────────
+# Server name or IP (e.g. DESKTOP-ABC\SQLEXPRESS  or  192.168.1.10)
+MSSQL_SERVER=YOUR_SERVER_NAME
+
+# Database name that contains the employee table
+MSSQL_DATABASE=YOUR_DATABASE_NAME
+
+# Set to "true" to use Windows Authentication (trusted connection)
+# Set to "false" to use SQL Server username/password authentication
+MSSQL_TRUSTED_CONNECTION=false
+
+# Only needed when MSSQL_TRUSTED_CONNECTION=false
+MSSQL_USER=YOUR_SQL_USERNAME
+MSSQL_PASSWORD=YOUR_SQL_PASSWORD
+
+# Set to "true" if connecting to Azure SQL or a server that requires TLS
+MSSQL_ENCRYPT=false
+
+# Exact schema-qualified table/view name (e.g. dbo.Employees)
+MSSQL_TABLE=dbo.Employees
+
+
+INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+VALUES
+('M1001', 'Aditya Kumar',  'aditya.kumar@mahle.com',  'hr',    'Gurgaon', 'HR Manager'),
+('M1002', 'Vikram Singh',  'vikram.singh@mahle.com',  'rnd',   'Gurgaon', 'R&D Manager'),
+('M1003', 'Priya Sharma',  'priya.sharma@mahle.com',  'fin',   'Gurgaon', 'Finance Executive');
+GO
+
+-- ── Assign Roles ──────────────────────────────────────────────
+INSERT INTO dbo.EmpRoles (Emp_No, Role, IsHOD, IsPanelJudge)
+VALUES
+('M1001', 'hr',  0, 0),   -- HR Admin
+('M1002', 'hod', 1, 1);   -- HOD + Panel Judge (M1003 is plain employee, no row needed)
+GO
+
+-- ── Verify + Show Passwords ───────────────────────────────────
+SELECT
+    e.Emp_No,
+    e.DisplayName,
+    e.Department,
+    ISNULL(r.Role, 'employee')  AS AppRole,
+    ISNULL(r.IsHOD, 0)         AS IsHOD,
+    ISNULL(r.IsPanelJudge, 0)  AS IsPanelJudge,
+    RIGHT(e.Emp_No, 4) + LEFT(REPLACE(e.DisplayName, ' ', ''), 4) AS DefaultPassword
+FROM dbo.Employees e
+LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
+ORDER BY e.Emp_No;
