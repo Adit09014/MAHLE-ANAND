@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import getPool, { sql } from "@/lib/mssql";
-import clientPromise from "@/lib/mongodb";
 import { AuthUser } from "@/lib/types";
 import { hashPassword, verifyPassword } from "@/lib/auth-utils";
 

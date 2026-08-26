@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import getPool, { sql } from "@/lib/mssql";
-import clientPromise from "@/lib/mongodb";
-import { AuthUser } from "@/lib/types";
+import { AuthUser, Cycle } from "@/lib/types";
 import { verifyPassword } from "@/lib/auth-utils";
 
 const TABLE = process.env.MSSQL_TABLE || "dbo.Employees";
@@ -80,12 +79,23 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Resolve panel judge assignment from MongoDB cycles
+    // 3. Resolve panel judge assignment from SQL Server dbo.Cycles
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const mongo = await clientPromise;
-    const db = mongo.db();
-    const cycle = await db.collection("cycles").findOne({ month: currentMonth });
+    const cycleReq = pool.request();
+    cycleReq.input("month", sql.NVarChar, currentMonth);
+    const cycleResult = await cycleReq.query(`
+      SELECT DataJSON FROM dbo.Cycles WHERE Month = @month
+    `);
+
+    let cycle: Cycle | null = null;
+    if (cycleResult.recordset.length) {
+      try {
+        cycle = JSON.parse(cycleResult.recordset[0].DataJSON);
+      } catch {
+        /* ignore JSON parse error */
+      }
+    }
 
     const isPanelJudge = Boolean(row.IsPanelJudge);
     let assignedJudgeSlot: string | undefined = undefined;
