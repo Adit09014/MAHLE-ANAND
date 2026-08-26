@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import getPool, { sql } from "@/lib/mssql";
-import clientPromise from "@/lib/mongodb";
 import { AuthUser } from "@/lib/types";
 import { verifyPassword } from "@/lib/auth-utils";
 
@@ -34,29 +33,27 @@ export async function POST(request: Request) {
     }
 
     const adminCode = adminUser.code.trim().toUpperCase();
-
-    // 1. Fetch admin name from SSMS (for default password formula fallback)
     const pool = await getPool();
+
+    // Fetch admin name + password hash from SSMS
     const req = pool.request();
     req.input("emp_no", sql.NVarChar, adminCode);
-    const ssmsResult = await req.query(
-      `SELECT DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no`
-    );
+    const result = await req.query(`
+      SELECT e.DisplayName, p.PasswordHash
+      FROM ${TABLE} e
+      LEFT JOIN dbo.EmpPasswords p ON e.Emp_No = p.Emp_No
+      WHERE e.Emp_No = @emp_no
+    `);
 
-    if (!ssmsResult.recordset.length) {
+    if (!result.recordset.length) {
       return NextResponse.json({ error: "Admin employee record not found." }, { status: 401 });
     }
 
-    const adminName = String(ssmsResult.recordset[0].DisplayName || "").trim();
+    const row = result.recordset[0];
+    const adminName = String(row.DisplayName || "").trim();
+    const storedHash: string | undefined = row.PasswordHash ?? undefined;
 
-    // 2. Fetch admin password hash from MongoDB
-    const mongo = await clientPromise;
-    const db = mongo.db();
-    const pwDoc = await db.collection("emp_passwords").findOne({ code: adminCode });
-
-    // 3. Verify admin password
-    const isValid = verifyPassword(adminPassword.trim(), pwDoc?.passwordHash, adminCode, adminName);
-
+    const isValid = verifyPassword(adminPassword.trim(), storedHash, adminCode, adminName);
     if (!isValid) {
       return NextResponse.json(
         { error: "Incorrect Admin Password. Authorization failed." },

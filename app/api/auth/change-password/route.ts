@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import getPool, { sql } from "@/lib/mssql";
-import clientPromise from "@/lib/mongodb";
 import { AuthUser } from "@/lib/types";
 import { verifyPassword, hashPassword } from "@/lib/auth-utils";
 
@@ -30,18 +29,15 @@ export async function POST(request: Request) {
     if (!currentPassword?.trim()) {
       return NextResponse.json({ error: "Current password is required." }, { status: 400 });
     }
-
     if (!newPassword?.trim()) {
       return NextResponse.json({ error: "New password is required." }, { status: 400 });
     }
-
     if (newPassword.trim().length < 4) {
       return NextResponse.json(
         { error: "New password must be at least 4 characters long." },
         { status: 400 }
       );
     }
-
     if (newPassword !== confirmPassword) {
       return NextResponse.json(
         { error: "New password and confirmation password do not match." },
@@ -50,32 +46,31 @@ export async function POST(request: Request) {
     }
 
     const empCode = currentUser.code.trim().toUpperCase();
-
-    // 1. Fetch employee name from SSMS (needed for default password formula)
     const pool = await getPool();
+
+    // Fetch employee name + existing password hash from SSMS
     const req = pool.request();
     req.input("emp_no", sql.NVarChar, empCode);
-    const ssmsResult = await req.query(
-      `SELECT DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no`
-    );
+    const result = await req.query(`
+      SELECT e.DisplayName, p.PasswordHash
+      FROM ${TABLE} e
+      LEFT JOIN dbo.EmpPasswords p ON e.Emp_No = p.Emp_No
+      WHERE e.Emp_No = @emp_no
+    `);
 
-    if (!ssmsResult.recordset.length) {
+    if (!result.recordset.length) {
       return NextResponse.json(
         { error: `Employee record '${empCode}' not found in database.` },
         { status: 404 }
       );
     }
 
-    const empName = String(ssmsResult.recordset[0].DisplayName || "").trim();
+    const row = result.recordset[0];
+    const empName = String(row.DisplayName || "").trim();
+    const storedHash: string | undefined = row.PasswordHash ?? undefined;
 
-    // 2. Fetch current password hash from MongoDB
-    const mongo = await clientPromise;
-    const db = mongo.db();
-    const pwDoc = await db.collection("emp_passwords").findOne({ code: empCode });
-
-    // 3. Verify current password
-    const isCurrentValid = verifyPassword(currentPassword, pwDoc?.passwordHash, empCode, empName);
-
+    // Verify current password
+    const isCurrentValid = verifyPassword(currentPassword, storedHash, empCode, empName);
     if (!isCurrentValid) {
       return NextResponse.json(
         { error: "Current password is incorrect. Please try again." },
@@ -83,13 +78,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Save new password hash to MongoDB
+    // Save new password hash into dbo.EmpPasswords (SSMS)
     const newHash = hashPassword(newPassword.trim());
-    await db.collection("emp_passwords").updateOne(
-      { code: empCode },
-      { $set: { code: empCode, passwordHash: newHash, updatedAt: new Date() } },
-      { upsert: true }
-    );
+    const upsertReq = pool.request();
+    upsertReq.input("emp_no", sql.NVarChar, empCode);
+    upsertReq.input("hash", sql.NVarChar(64), newHash);
+
+    await upsertReq.query(`
+      MERGE dbo.EmpPasswords AS target
+      USING (VALUES (@emp_no, @hash)) AS source (Emp_No, PasswordHash)
+      ON target.Emp_No = source.Emp_No
+      WHEN MATCHED THEN
+        UPDATE SET PasswordHash = source.PasswordHash, UpdatedAt = GETDATE()
+      WHEN NOT MATCHED THEN
+        INSERT (Emp_No, PasswordHash) VALUES (source.Emp_No, source.PasswordHash);
+    `);
 
     return NextResponse.json({
       ok: true,

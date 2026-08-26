@@ -25,16 +25,23 @@ export async function POST(request: Request) {
     }
 
     const empCode = code.trim().toUpperCase();
-
-    // 1. Fetch employee identity from SQL Server
     const pool = await getPool();
+
+    // 1. Fetch employee identity + role + password hash from SSMS in one query
     const req = pool.request();
     req.input("emp_no", sql.NVarChar, empCode);
-    const result = await req.query(
-      `SELECT Emp_No, DisplayName, Work_Email, Department, Location, Designation
-       FROM ${TABLE}
-       WHERE Emp_No = @emp_no`
-    );
+    const result = await req.query(`
+      SELECT
+        e.Emp_No, e.DisplayName, e.Work_Email, e.Department, e.Location, e.Designation,
+        ISNULL(r.Role, 'employee')  AS Role,
+        ISNULL(r.IsPanelJudge, 0)  AS IsPanelJudge,
+        ISNULL(r.Gender, '')       AS Gender,
+        p.PasswordHash
+      FROM ${TABLE} e
+      LEFT JOIN dbo.EmpRoles     r ON e.Emp_No = r.Emp_No
+      LEFT JOIN dbo.EmpPasswords p ON e.Emp_No = p.Emp_No
+      WHERE e.Emp_No = @emp_no
+    `);
 
     if (!result.recordset.length) {
       return NextResponse.json(
@@ -43,26 +50,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const ssmsRow = result.recordset[0];
-    const empName = String(ssmsRow.DisplayName || "").trim();
-    const empDesignation = String(ssmsRow.Designation || "").trim();
-    const empUnitId = String(ssmsRow.Department || "").trim();
+    const row = result.recordset[0];
+    const empName = String(row.DisplayName || "").trim();
+    const empRole = String(row.Role || "employee");
+    const storedHash: string | undefined = row.PasswordHash ?? undefined;
 
-    // 2. Fetch role & password hash from MongoDB
-    const mongo = await clientPromise;
-    const db = mongo.db();
-
-    const [roleDoc, pwDoc] = await Promise.all([
-      db.collection("emp_roles").findOne({ code: empCode }),
-      db.collection("emp_passwords").findOne({ code: empCode }),
-    ]);
-
-    const empRole: string = roleDoc?.role || "employee";
-    const storedHash: string | undefined = pwDoc?.passwordHash;
-
-    // 3. Validate role
+    // 2. Validate role & password
     if (role === "hr" && empRole !== "hr") {
-      // HR login: also allow master HR password fallback
       const isValidPassword =
         password === (process.env.HR_MASTER_PASSWORD || "") ||
         verifyPassword(password, storedHash, empCode, empName);
@@ -74,7 +68,6 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      // Standard employee login
       const isValidPassword = verifyPassword(password, storedHash, empCode, empName);
       if (!isValidPassword) {
         return NextResponse.json(
@@ -84,12 +77,14 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Resolve panel judge assignment from MongoDB cycles
+    // 3. Resolve panel judge assignment from MongoDB cycles
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const mongo = await clientPromise;
+    const db = mongo.db();
     const cycle = await db.collection("cycles").findOne({ month: currentMonth });
 
-    const isPanelJudge = Boolean(roleDoc?.isPanelJudge);
+    const isPanelJudge = Boolean(row.IsPanelJudge);
     let assignedJudgeSlot: string | undefined = undefined;
 
     if (isPanelJudge && cycle?.judges) {
@@ -107,13 +102,13 @@ export async function POST(request: Request) {
       role: userRole,
       name: empName,
       code: empCode,
-      unitId: empUnitId,
+      unitId: String(row.Department || "").trim(),
       designation:
-        empDesignation ||
+        String(row.Designation || "").trim() ||
         (userRole === "hr" ? "HR Admin" : userRole === "hod" ? "Department Head" : "Staff Member"),
       isPanelJudge,
       judgeId: assignedJudgeSlot,
-      gender: roleDoc?.gender || "",
+      gender: String(row.Gender || ""),
     };
 
     const cookieStore = await cookies();

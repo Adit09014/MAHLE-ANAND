@@ -3,14 +3,14 @@ import { cookies } from "next/headers";
 import getPool, { sql } from "@/lib/mssql";
 import clientPromise from "@/lib/mongodb";
 import { AuthUser } from "@/lib/types";
-import { generateDefaultPassword, hashPassword, verifyPassword } from "@/lib/auth-utils";
+import { hashPassword, verifyPassword } from "@/lib/auth-utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const TABLE = process.env.MSSQL_TABLE || "dbo.Employees";
 
 /**
- * Maps an SSMS row to the app's internal employee shape.
+ * Maps an SSMS Employees row to the app's internal employee shape.
  * SSMS columns: Emp_No, DisplayName, Work_Email, Department, Location, Designation
  */
 function mapSsmsRow(row: Record<string, unknown>) {
@@ -25,7 +25,7 @@ function mapSsmsRow(row: Record<string, unknown>) {
 }
 
 // ─── GET /api/employees ───────────────────────────────────────────────────────
-// Returns employees from SSMS, merged with roles/isPanelJudge from MongoDB.
+// Returns employees from SSMS Employees, merged with roles from EmpRoles.
 
 export async function GET(request: Request) {
   try {
@@ -34,50 +34,44 @@ export async function GET(request: Request) {
     const unitId = searchParams.get("unitId");
     const role = searchParams.get("role");
 
-    // 1. Build SSMS query
     const pool = await getPool();
     const req = pool.request();
 
-    let query = `SELECT Emp_No, DisplayName, Work_Email, Department, Location, Designation FROM ${TABLE} WHERE 1=1`;
+    // Join Employees + EmpRoles in a single query
+    let query = `
+      SELECT
+        e.Emp_No, e.DisplayName, e.Work_Email, e.Department, e.Location, e.Designation,
+        ISNULL(r.Role, 'employee')   AS Role,
+        ISNULL(r.IsPanelJudge, 0)   AS IsPanelJudge,
+        ISNULL(r.Gender, '')         AS Gender
+      FROM ${TABLE} e
+      LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
+      WHERE 1=1
+    `;
 
     if (code) {
       req.input("emp_no", sql.NVarChar, code.trim().toUpperCase());
-      query += " AND Emp_No = @emp_no";
+      query += " AND e.Emp_No = @emp_no";
     }
     if (unitId) {
       req.input("department", sql.NVarChar, unitId);
-      query += " AND Department = @department";
+      query += " AND e.Department = @department";
+    }
+    if (role) {
+      req.input("role", sql.NVarChar, role);
+      query += " AND ISNULL(r.Role, 'employee') = @role";
     }
 
     const result = await req.query(query);
-    let employees = result.recordset.map(mapSsmsRow);
 
-    // 2. Merge roles from MongoDB (emp_roles collection)
-    const mongo = await clientPromise;
-    const db = mongo.db();
-
-    const codes = employees.map((e) => e.code);
-    const roleDocs = codes.length
-      ? await db.collection("emp_roles").find({ code: { $in: codes } }).toArray()
-      : [];
-
-    const roleMap: Record<string, { role: string; isPanelJudge: boolean }> = {};
-    for (const doc of roleDocs) {
-      roleMap[doc.code] = { role: doc.role || "employee", isPanelJudge: Boolean(doc.isPanelJudge) };
-    }
-
-    let merged = employees.map((emp) => ({
-      ...emp,
-      role: roleMap[emp.code]?.role || "employee",
-      isPanelJudge: roleMap[emp.code]?.isPanelJudge || false,
+    const employees = result.recordset.map((row) => ({
+      ...mapSsmsRow(row),
+      role: String(row.Role || "employee"),
+      isPanelJudge: Boolean(row.IsPanelJudge),
+      gender: String(row.Gender || ""),
     }));
 
-    // 3. Filter by role if requested
-    if (role) {
-      merged = merged.filter((e) => e.role === role);
-    }
-
-    return NextResponse.json({ employees: merged });
+    return NextResponse.json({ employees });
   } catch (error) {
     console.error("[GET /api/employees]", error);
     return NextResponse.json(
@@ -88,8 +82,8 @@ export async function GET(request: Request) {
 }
 
 // ─── POST /api/employees ─────────────────────────────────────────────────────
-// Upserts the role / isPanelJudge for an employee into MongoDB (emp_roles).
-// SSMS is the source of truth for identity — POST cannot create new employees.
+// Upserts role/isPanelJudge for an employee into dbo.EmpRoles.
+// Identity comes from SSMS — POST cannot create new employees.
 
 export async function POST(request: Request) {
   try {
@@ -97,16 +91,13 @@ export async function POST(request: Request) {
     const { code, role, isPanelJudge } = body;
 
     if (!code) {
-      return NextResponse.json(
-        { error: "Employee code is required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Employee code is required." }, { status: 400 });
     }
 
     const empCode = code.trim().toUpperCase();
-
-    // Verify the employee actually exists in SSMS
     const pool = await getPool();
+
+    // Verify the employee exists in dbo.Employees
     const checkReq = pool.request();
     checkReq.input("emp_no", sql.NVarChar, empCode);
     const check = await checkReq.query(
@@ -120,35 +111,31 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upsert role metadata in MongoDB
-    const mongo = await clientPromise;
-    const db = mongo.db();
+    // MERGE into dbo.EmpRoles (upsert)
+    const upsertReq = pool.request();
+    upsertReq.input("emp_no", sql.NVarChar, empCode);
+    upsertReq.input("role", sql.NVarChar, role || "employee");
+    upsertReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
 
-    const roleData = {
-      code: empCode,
-      role: role || "employee",
-      isPanelJudge: Boolean(isPanelJudge),
-      updatedAt: new Date(),
-    };
+    await upsertReq.query(`
+      MERGE dbo.EmpRoles AS target
+      USING (VALUES (@emp_no, @role, @isPanelJudge)) AS source (Emp_No, Role, IsPanelJudge)
+      ON target.Emp_No = source.Emp_No
+      WHEN MATCHED THEN
+        UPDATE SET Role = source.Role, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+      WHEN NOT MATCHED THEN
+        INSERT (Emp_No, Role, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsPanelJudge);
+    `);
 
-    await db.collection("emp_roles").updateOne(
-      { code: empCode },
-      { $set: roleData },
-      { upsert: true }
-    );
-
-    return NextResponse.json({ ok: true, employee: roleData });
+    return NextResponse.json({ ok: true, employee: { code: empCode, role, isPanelJudge } });
   } catch (error) {
     console.error("[POST /api/employees]", error);
-    return NextResponse.json(
-      { error: "Failed to update employee role." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update employee role." }, { status: 500 });
   }
 }
 
 // ─── PUT /api/employees ───────────────────────────────────────────────────────
-// Updates role, isPanelJudge, or resets/sets password for an employee.
+// Updates role, isPanelJudge, or password for an employee (all in SSMS).
 
 export async function PUT(request: Request) {
   try {
@@ -167,7 +154,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { code, role, isPanelJudge, designation, newPassword, resetPassword, adminPassword } = body;
+    const { code, role, isPanelJudge, newPassword, resetPassword, adminPassword } = body;
 
     if (!adminPassword?.trim()) {
       return NextResponse.json(
@@ -184,29 +171,28 @@ export async function PUT(request: Request) {
     }
 
     const adminCode = adminUser.code.trim().toUpperCase();
-    const mongo = await clientPromise;
-    const db = mongo.db();
-
-    // Verify admin via SSMS (identity) + MongoDB (password)
     const pool = await getPool();
-    const adminReq = pool.request();
-    adminReq.input("emp_no", sql.NVarChar, adminCode);
-    const adminSsms = await adminReq.query(
-      `SELECT Emp_No, DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no`
-    );
 
-    if (!adminSsms.recordset.length) {
+    // Fetch admin identity + password hash from SSMS
+    const adminReq = pool.request();
+    adminReq.input("admin_code", sql.NVarChar, adminCode);
+    const adminResult = await adminReq.query(`
+      SELECT e.DisplayName, p.PasswordHash
+      FROM ${TABLE} e
+      LEFT JOIN dbo.EmpPasswords p ON e.Emp_No = p.Emp_No
+      WHERE e.Emp_No = @admin_code
+    `);
+
+    if (!adminResult.recordset.length) {
       return NextResponse.json({ error: "Admin employee record not found." }, { status: 401 });
     }
 
-    const adminSsmsRow = adminSsms.recordset[0];
-    const adminPwDoc = await db.collection("emp_passwords").findOne({ code: adminCode });
-
+    const adminRow = adminResult.recordset[0];
     const isAdminPasswordValid = verifyPassword(
       adminPassword,
-      adminPwDoc?.passwordHash,
+      adminRow.PasswordHash ?? undefined,
       adminCode,
-      String(adminSsmsRow.DisplayName)
+      String(adminRow.DisplayName)
     );
 
     if (!isAdminPasswordValid) {
@@ -219,56 +205,69 @@ export async function PUT(request: Request) {
     // Verify target employee exists in SSMS
     const empCode = code.trim().toUpperCase();
     const empReq = pool.request();
-    empReq.input("emp_no2", sql.NVarChar, empCode);
-    const empSsms = await empReq.query(
-      `SELECT Emp_No, DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no2`
-    );
+    empReq.input("emp_no", sql.NVarChar, empCode);
+    const empResult = await empReq.query(`
+      SELECT DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no
+    `);
 
-    if (!empSsms.recordset.length) {
+    if (!empResult.recordset.length) {
       return NextResponse.json(
         { error: `Employee '${empCode}' not found in SQL Server directory.` },
         { status: 404 }
       );
     }
 
-    // Update role in MongoDB emp_roles
-    const roleUpdate: Record<string, unknown> = { updatedAt: new Date() };
-    if (role) roleUpdate.role = role;
-    if (typeof isPanelJudge === "boolean") roleUpdate.isPanelJudge = isPanelJudge;
+    // Update dbo.EmpRoles if role/isPanelJudge provided
+    if (role !== undefined || isPanelJudge !== undefined) {
+      const roleReq = pool.request();
+      roleReq.input("emp_no", sql.NVarChar, empCode);
+      roleReq.input("role", sql.NVarChar, role || "employee");
+      roleReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
 
-    await db.collection("emp_roles").updateOne(
-      { code: empCode },
-      { $set: { code: empCode, ...roleUpdate } },
-      { upsert: true }
-    );
+      await roleReq.query(`
+        MERGE dbo.EmpRoles AS target
+        USING (VALUES (@emp_no, @role, @isPanelJudge)) AS source (Emp_No, Role, IsPanelJudge)
+        ON target.Emp_No = source.Emp_No
+        WHEN MATCHED THEN
+          UPDATE SET Role = source.Role, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+        WHEN NOT MATCHED THEN
+          INSERT (Emp_No, Role, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsPanelJudge);
+      `);
+    }
 
-    // Handle password change
-    const empDisplayName = String(empSsms.recordset[0].DisplayName);
+    // Handle password update
     if (newPassword?.trim()) {
       const newHash = hashPassword(newPassword.trim());
-      await db.collection("emp_passwords").updateOne(
-        { code: empCode },
-        { $set: { code: empCode, passwordHash: newHash, updatedAt: new Date() } },
-        { upsert: true }
-      );
+      const pwReq = pool.request();
+      pwReq.input("emp_no", sql.NVarChar, empCode);
+      pwReq.input("hash", sql.NVarChar(64), newHash);
+
+      await pwReq.query(`
+        MERGE dbo.EmpPasswords AS target
+        USING (VALUES (@emp_no, @hash)) AS source (Emp_No, PasswordHash)
+        ON target.Emp_No = source.Emp_No
+        WHEN MATCHED THEN
+          UPDATE SET PasswordHash = source.PasswordHash, UpdatedAt = GETDATE()
+        WHEN NOT MATCHED THEN
+          INSERT (Emp_No, PasswordHash) VALUES (source.Emp_No, source.PasswordHash);
+      `);
     } else if (resetPassword) {
-      // Remove custom hash → fallback to default formula
-      await db.collection("emp_passwords").deleteOne({ code: empCode });
+      // Delete custom hash — fallback to default formula on next login
+      const delReq = pool.request();
+      delReq.input("emp_no", sql.NVarChar, empCode);
+      await delReq.query(`DELETE FROM dbo.EmpPasswords WHERE Emp_No = @emp_no`);
     }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[PUT /api/employees]", error);
-    return NextResponse.json(
-      { error: "Failed to update employee details." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to update employee details." }, { status: 500 });
   }
 }
 
 // ─── DELETE /api/employees ────────────────────────────────────────────────────
-// Removes the employee's role & password overrides from MongoDB.
-// (Cannot delete from SSMS — it's the HR master directory.)
+// Removes role & password overrides from SSMS.
+// (Cannot delete from dbo.Employees — it is the HR master directory.)
 
 export async function DELETE(request: Request) {
   try {
@@ -293,37 +292,33 @@ export async function DELETE(request: Request) {
     if (!code) {
       return NextResponse.json({ error: "Employee code is required." }, { status: 400 });
     }
-
     if (!adminPassword?.trim()) {
-      return NextResponse.json(
-        { error: "Admin confirmation password is required." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Admin confirmation password is required." }, { status: 400 });
     }
 
     const adminCode = adminUser.code.trim().toUpperCase();
-    const mongo = await clientPromise;
-    const db = mongo.db();
     const pool = await getPool();
 
-    // Verify admin identity in SSMS
+    // Verify admin identity + password from SSMS
     const adminReq = pool.request();
-    adminReq.input("emp_no", sql.NVarChar, adminCode);
-    const adminSsms = await adminReq.query(
-      `SELECT Emp_No, DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no`
-    );
+    adminReq.input("admin_code", sql.NVarChar, adminCode);
+    const adminResult = await adminReq.query(`
+      SELECT e.DisplayName, p.PasswordHash
+      FROM ${TABLE} e
+      LEFT JOIN dbo.EmpPasswords p ON e.Emp_No = p.Emp_No
+      WHERE e.Emp_No = @admin_code
+    `);
 
-    if (!adminSsms.recordset.length) {
+    if (!adminResult.recordset.length) {
       return NextResponse.json({ error: "Admin employee record not found." }, { status: 401 });
     }
 
-    const adminPwDoc = await db.collection("emp_passwords").findOne({ code: adminCode });
-
+    const adminRow = adminResult.recordset[0];
     const isAdminPasswordValid = verifyPassword(
       adminPassword.trim(),
-      adminPwDoc?.passwordHash,
+      adminRow.PasswordHash ?? undefined,
       adminCode,
-      String(adminSsms.recordset[0].DisplayName)
+      String(adminRow.DisplayName)
     );
 
     if (!isAdminPasswordValid) {
@@ -335,19 +330,21 @@ export async function DELETE(request: Request) {
 
     const empCode = code.trim().toUpperCase();
 
-    // Remove role + password overrides from MongoDB
-    await db.collection("emp_roles").deleteOne({ code: empCode });
-    await db.collection("emp_passwords").deleteOne({ code: empCode });
+    // Remove role + password rows from SSMS (CASCADE from Employees is NOT triggered here)
+    const delRoleReq = pool.request();
+    delRoleReq.input("emp_no", sql.NVarChar, empCode);
+    await delRoleReq.query(`DELETE FROM dbo.EmpRoles WHERE Emp_No = @emp_no`);
+
+    const delPwReq = pool.request();
+    delPwReq.input("emp_no", sql.NVarChar, empCode);
+    await delPwReq.query(`DELETE FROM dbo.EmpPasswords WHERE Emp_No = @emp_no`);
 
     return NextResponse.json({
       ok: true,
-      message: `Employee ${empCode} app data removed. (SSMS record unchanged.)`,
+      message: `Employee ${empCode} app data removed. (HR record in dbo.Employees unchanged.)`,
     });
   } catch (error) {
     console.error("[DELETE /api/employees]", error);
-    return NextResponse.json(
-      { error: "Failed to remove employee data." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to remove employee data." }, { status: 500 });
   }
 }
