@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       SELECT
         e.Emp_No, e.DisplayName, e.Work_Email, e.Department, e.Location, e.Designation,
         ISNULL(r.Role, 'employee')  AS Role,
+        ISNULL(r.IsHOD, 0)         AS IsHOD,
         ISNULL(r.IsPanelJudge, 0)  AS IsPanelJudge,
         ISNULL(r.Gender, '')       AS Gender,
         p.PasswordHash
@@ -52,7 +53,9 @@ export async function POST(request: Request) {
 
     const row = result.recordset[0];
     const empName = String(row.DisplayName || "").trim();
-    const empRole = String(row.Role || "employee");
+    const dbRole = String(row.Role || "employee");
+    // IsHOD=1 overrides role to 'hod' regardless of the Role column
+    const empRole = Boolean(row.IsHOD) ? "hod" : dbRole;
     const storedHash: string | undefined = row.PasswordHash ?? undefined;
 
     // 2. Validate role & password

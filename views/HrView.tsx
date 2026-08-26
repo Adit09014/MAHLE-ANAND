@@ -67,6 +67,7 @@ export interface EmployeeRecord {
   name: string;
   unitId: string;
   role: "employee" | "hod" | "hr";
+  isHOD?: boolean;
   isPanelJudge?: boolean;
   gender?: string;
   designation?: string;
@@ -109,6 +110,7 @@ export const HrView: React.FC<HrViewProps> = ({
   const [editUnitId, setEditUnitId] = useState("p1");
   const [editRole, setEditRole] = useState<"employee" | "hod" | "hr">("employee");
   const [editIsPanelJudge, setEditIsPanelJudge] = useState(false);
+  const [editIsHOD, setEditIsHOD] = useState(false);
   const [editGender, setEditGender] = useState("");
   const [editNewPassword, setEditNewPassword] = useState("");
   const [editResetDefault, setEditResetDefault] = useState(false);
@@ -236,6 +238,7 @@ export const HrView: React.FC<HrViewProps> = ({
     setEditUnitId(emp.unitId);
     setEditRole(emp.role || "employee");
     setEditIsPanelJudge(Boolean(emp.isPanelJudge));
+    setEditIsHOD(Boolean(emp.isHOD));
     setEditGender(emp.gender || "");
     setEditNewPassword("");
     setEditResetDefault(false);
@@ -274,7 +277,8 @@ export const HrView: React.FC<HrViewProps> = ({
           code: editingEmp.code,
           name: editName,
           unitId: editUnitId,
-          role: editRole,
+          role: editIsHOD ? "hod" : editRole,
+          isHOD: editIsHOD,
           isPanelJudge: editIsPanelJudge,
           gender: editGender,
           newPassword: editNewPassword.trim() ? editNewPassword.trim() : undefined,
@@ -955,6 +959,70 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </Card>
 
+      {/* HOD Management by Department */}
+      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-900/10 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-blue-950 flex items-center gap-2">
+              <ShieldCheck size={18} className="text-blue-700" />
+              HOD Management — Assign Heads of Department
+            </h3>
+            <p className="mt-1 text-xs text-blue-900/60">
+              Employees marked as HOD gain access to the HOD Endorsement panel. One HOD per department is recommended.
+              Use the Employee Directory below to set <strong>IsHOD</strong> on any employee.
+            </p>
+          </div>
+          <Pill tone="good">HR Admin Only</Pill>
+        </div>
+
+        <div className="mt-5 overflow-x-auto rounded-xl border border-blue-900/10">
+          <table className="w-full text-xs">
+            <thead className="bg-blue-900/5 text-blue-900/70 font-bold uppercase tracking-wider text-[11px]">
+              <tr>
+                <th className="px-4 py-3 text-left">Department</th>
+                <th className="px-4 py-3 text-left">Current HOD</th>
+                <th className="px-4 py-3 text-left">Emp Code</th>
+                <th className="px-4 py-3 text-left">Designation</th>
+                <th className="px-4 py-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-blue-900/10 bg-white">
+              {(() => {
+                // Group HODs by department
+                const hods = allEmployees.filter((e) => e.isHOD || e.role === "hod");
+                if (hods.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-blue-900/40 italic">
+                        No HODs assigned yet. Edit any employee below and toggle &quot;Mark as HOD&quot; to assign them.
+                      </td>
+                    </tr>
+                  );
+                }
+                return hods.map((hod) => (
+                  <tr key={hod.code} className="hover:bg-blue-50/40 transition">
+                    <td className="px-4 py-3 font-semibold text-blue-950">
+                      {unitById(hod.unitId)?.name || hod.unitId}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-blue-950">{hod.name}</td>
+                    <td className="px-4 py-3 font-mono text-blue-900/70">{hod.code}</td>
+                    <td className="px-4 py-3 text-blue-900/60">{hod.designation || "—"}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => openEditModal(hod)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50 transition active:scale-95 shadow-2xs"
+                      >
+                        <Edit3 size={13} /> Edit / Remove HOD
+                      </button>
+                    </td>
+                  </tr>
+                ));
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       {/* 4. Panel Judge Selection (HODs Only, Max 3 Allowed) */}
       <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-900/10 pb-4">
@@ -1535,12 +1603,16 @@ export const HrView: React.FC<HrViewProps> = ({
                   <select
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value as "employee" | "hod" | "hr")}
-                    className={inputCls}
+                    disabled={editIsHOD}
+                    className={`${inputCls} ${editIsHOD ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <option value="employee">Employee</option>
                     <option value="hod">HOD (Department Head)</option>
                     <option value="hr">HR Admin</option>
                   </select>
+                  {editIsHOD && (
+                    <p className="mt-1 text-[10px] text-blue-600 font-medium">Role auto-set to HOD when IsHOD is enabled.</p>
+                  )}
                 </div>
                 <div>
                   <Label>Change Password</Label>
@@ -1554,17 +1626,39 @@ export const HrView: React.FC<HrViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="editIsPanelJudge"
-                  checked={editIsPanelJudge}
-                  onChange={(e) => setEditIsPanelJudge(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-800 focus:ring-blue-700"
-                />
-                <label htmlFor="editIsPanelJudge" className="text-xs font-semibold text-blue-950">
-                  Appoint as Panel Judge (`isPanelJudge: true`)
-                </label>
+              {/* IsHOD & Panel Judge Toggles */}
+              <div className="rounded-xl border border-blue-900/10 bg-blue-900/3 p-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-900/50 mb-1">Access Flags</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="editIsHOD"
+                    checked={editIsHOD}
+                    onChange={(e) => {
+                      setEditIsHOD(e.target.checked);
+                      if (e.target.checked) setEditRole("hod");
+                    }}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-800 focus:ring-blue-700"
+                  />
+                  <label htmlFor="editIsHOD" className="text-xs font-semibold text-blue-950">
+                    Mark as HOD (Head of Department)
+                    <span className="ml-1 font-normal text-blue-900/50">— grants HOD endorsement access</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="editIsPanelJudge"
+                    checked={editIsPanelJudge}
+                    onChange={(e) => setEditIsPanelJudge(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                  />
+                  <label htmlFor="editIsPanelJudge" className="text-xs font-semibold text-blue-950">
+                    Appoint as Panel Judge
+                    <span className="ml-1 font-normal text-blue-900/50">— grants panel scoring access</span>
+                  </label>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">

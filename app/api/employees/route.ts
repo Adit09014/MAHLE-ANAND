@@ -42,8 +42,9 @@ export async function GET(request: Request) {
       SELECT
         e.Emp_No, e.DisplayName, e.Work_Email, e.Department, e.Location, e.Designation,
         ISNULL(r.Role, 'employee')   AS Role,
+        ISNULL(r.IsHOD, 0)          AS IsHOD,
         ISNULL(r.IsPanelJudge, 0)   AS IsPanelJudge,
-        ISNULL(r.Gender, '')         AS Gender
+        ISNULL(r.Gender, '')        AS Gender
       FROM ${TABLE} e
       LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
       WHERE 1=1
@@ -58,18 +59,31 @@ export async function GET(request: Request) {
       query += " AND e.Department = @department";
     }
     if (role) {
-      req.input("role", sql.NVarChar, role);
-      query += " AND ISNULL(r.Role, 'employee') = @role";
+      req.input("role_filter", sql.NVarChar, role);
+      // HOD filter: match either Role='hod' OR IsHOD=1
+      if (role === "hod") {
+        query += " AND (ISNULL(r.Role, 'employee') = 'hod' OR ISNULL(r.IsHOD, 0) = 1)";
+      } else {
+        query += " AND ISNULL(r.Role, 'employee') = @role_filter";
+      }
     }
 
     const result = await req.query(query);
 
-    const employees = result.recordset.map((row) => ({
-      ...mapSsmsRow(row),
-      role: String(row.Role || "employee"),
-      isPanelJudge: Boolean(row.IsPanelJudge),
-      gender: String(row.Gender || ""),
-    }));
+    const employees = result.recordset.map((row) => {
+      const isHod = Boolean(row.IsHOD);
+      // IsHOD=1 always resolves to 'hod' role regardless of Role column
+      const resolvedRole = isHod
+        ? "hod"
+        : String(row.Role || "employee");
+      return {
+        ...mapSsmsRow(row),
+        role: resolvedRole,
+        isHOD: isHod,
+        isPanelJudge: Boolean(row.IsPanelJudge),
+        gender: String(row.Gender || ""),
+      };
+    });
 
     return NextResponse.json({ employees });
   } catch (error) {
@@ -95,6 +109,7 @@ export async function POST(request: Request) {
     }
 
     const empCode = code.trim().toUpperCase();
+    const { isHOD } = body;
     const pool = await getPool();
 
     // Verify the employee exists in dbo.Employees
@@ -111,23 +126,27 @@ export async function POST(request: Request) {
       );
     }
 
+    // Derive role: IsHOD=1 always means 'hod'
+    const resolvedRole = isHOD ? "hod" : (role || "employee");
+
     // MERGE into dbo.EmpRoles (upsert)
     const upsertReq = pool.request();
     upsertReq.input("emp_no", sql.NVarChar, empCode);
-    upsertReq.input("role", sql.NVarChar, role || "employee");
+    upsertReq.input("role", sql.NVarChar, resolvedRole);
+    upsertReq.input("isHOD", sql.Bit, isHOD ? 1 : 0);
     upsertReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
 
     await upsertReq.query(`
       MERGE dbo.EmpRoles AS target
-      USING (VALUES (@emp_no, @role, @isPanelJudge)) AS source (Emp_No, Role, IsPanelJudge)
+      USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge)) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
       ON target.Emp_No = source.Emp_No
       WHEN MATCHED THEN
-        UPDATE SET Role = source.Role, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+        UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
       WHEN NOT MATCHED THEN
-        INSERT (Emp_No, Role, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsPanelJudge);
+        INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
     `);
 
-    return NextResponse.json({ ok: true, employee: { code: empCode, role, isPanelJudge } });
+    return NextResponse.json({ ok: true, employee: { code: empCode, role: resolvedRole, isHOD, isPanelJudge } });
   } catch (error) {
     console.error("[POST /api/employees]", error);
     return NextResponse.json({ error: "Failed to update employee role." }, { status: 500 });
@@ -154,7 +173,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { code, role, isPanelJudge, newPassword, resetPassword, adminPassword } = body;
+    const { code, role, isPanelJudge, isHOD, newPassword, resetPassword, adminPassword } = body;
 
     if (!adminPassword?.trim()) {
       return NextResponse.json(
@@ -217,21 +236,25 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Update dbo.EmpRoles if role/isPanelJudge provided
-    if (role !== undefined || isPanelJudge !== undefined) {
+    // Update dbo.EmpRoles if role/isHOD/isPanelJudge provided
+    if (role !== undefined || isHOD !== undefined || isPanelJudge !== undefined) {
+      // IsHOD=1 always forces role to 'hod'
+      const resolvedRole = isHOD ? "hod" : (role || "employee");
+
       const roleReq = pool.request();
       roleReq.input("emp_no", sql.NVarChar, empCode);
-      roleReq.input("role", sql.NVarChar, role || "employee");
+      roleReq.input("role", sql.NVarChar, resolvedRole);
+      roleReq.input("isHOD", sql.Bit, isHOD ? 1 : 0);
       roleReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
 
       await roleReq.query(`
         MERGE dbo.EmpRoles AS target
-        USING (VALUES (@emp_no, @role, @isPanelJudge)) AS source (Emp_No, Role, IsPanelJudge)
+        USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge)) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
         ON target.Emp_No = source.Emp_No
         WHEN MATCHED THEN
-          UPDATE SET Role = source.Role, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+          UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
         WHEN NOT MATCHED THEN
-          INSERT (Emp_No, Role, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsPanelJudge);
+          INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
       `);
     }
 
