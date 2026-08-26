@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import getPool, { sql } from "@/lib/mssql";
 import clientPromise from "@/lib/mongodb";
 import { AuthUser } from "@/lib/types";
 import { verifyPassword } from "@/lib/auth-utils";
+
+const TABLE = process.env.MSSQL_TABLE || "dbo.Employees";
 
 export async function POST(request: Request) {
   try {
@@ -13,90 +16,104 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid login type specified." }, { status: 400 });
     }
 
-    if (!code || !code.trim()) {
+    if (!code?.trim()) {
       return NextResponse.json({ error: "Employee Code (ID) is required." }, { status: 400 });
     }
 
-    if (!password || !password.trim()) {
+    if (!password?.trim()) {
       return NextResponse.json({ error: "Password is required." }, { status: 400 });
     }
 
     const empCode = code.trim().toUpperCase();
-    const client = await clientPromise;
-    const db = client.db();
 
-    const empRecord = await db.collection("employees").findOne({ code: empCode });
+    // 1. Fetch employee identity from SQL Server
+    const pool = await getPool();
+    const req = pool.request();
+    req.input("emp_no", sql.NVarChar, empCode);
+    const result = await req.query(
+      `SELECT Emp_No, DisplayName, Work_Email, Department, Location, Designation
+       FROM ${TABLE}
+       WHERE Emp_No = @emp_no`
+    );
 
-    if (!empRecord) {
+    if (!result.recordset.length) {
       return NextResponse.json(
         { error: `Employee code '${empCode}' not found in database. Please check your ID.` },
         { status: 401 }
       );
     }
 
-    // Role validation
-    if (role === "hr" && empRecord.role !== "hr") {
-      // Fallback if password matches master HR password or HR record
+    const ssmsRow = result.recordset[0];
+    const empName = String(ssmsRow.DisplayName || "").trim();
+    const empDesignation = String(ssmsRow.Designation || "").trim();
+    const empUnitId = String(ssmsRow.Department || "").trim();
+
+    // 2. Fetch role & password hash from MongoDB
+    const mongo = await clientPromise;
+    const db = mongo.db();
+
+    const [roleDoc, pwDoc] = await Promise.all([
+      db.collection("emp_roles").findOne({ code: empCode }),
+      db.collection("emp_passwords").findOne({ code: empCode }),
+    ]);
+
+    const empRole: string = roleDoc?.role || "employee";
+    const storedHash: string | undefined = pwDoc?.passwordHash;
+
+    // 3. Validate role
+    if (role === "hr" && empRole !== "hr") {
+      // HR login: also allow master HR password fallback
       const isValidPassword =
         password === (process.env.HR_MASTER_PASSWORD || "") ||
-        verifyPassword(password, empRecord.passwordHash, empRecord.code, empRecord.name);
+        verifyPassword(password, storedHash, empCode, empName);
 
       if (!isValidPassword) {
         return NextResponse.json(
-          { error: `Employee code '${empCode}' does not have HR Admin privileges or password is incorrect.` },
+          { error: `Employee '${empCode}' does not have HR Admin privileges or password is incorrect.` },
           { status: 401 }
         );
       }
     } else {
-      // Standard password verification against hashed password in DB
-      const isValidPassword = verifyPassword(
-        password,
-        empRecord.passwordHash,
-        empRecord.code,
-        empRecord.name
-      );
-
+      // Standard employee login
+      const isValidPassword = verifyPassword(password, storedHash, empCode, empName);
       if (!isValidPassword) {
         return NextResponse.json(
-          {
-            error: `Incorrect password for '${empCode}'. Please verify your credentials and try again.`,
-          },
+          { error: `Incorrect password for '${empCode}'. Please verify your credentials and try again.` },
           { status: 401 }
         );
       }
     }
 
+    // 4. Resolve panel judge assignment from MongoDB cycles
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const cycle = await db.collection("cycles").findOne({ month: currentMonth });
 
-    const isPanelJudge = Boolean(empRecord.isPanelJudge);
+    const isPanelJudge = Boolean(roleDoc?.isPanelJudge);
     let assignedJudgeSlot: string | undefined = undefined;
 
-    if (isPanelJudge && cycle && cycle.judges) {
+    if (isPanelJudge && cycle?.judges) {
       const found = cycle.judges.find(
         (j: { id: string; name?: string; code?: string }) =>
           (j.code && j.code.toUpperCase() === empCode) ||
-          (j.name && j.name.toLowerCase().includes(empRecord.name.toLowerCase()))
+          (j.name && j.name.toLowerCase().includes(empName.toLowerCase()))
       );
-      if (found) {
-        assignedJudgeSlot = found.id;
-      } else {
-        assignedJudgeSlot = empCode;
-      }
+      assignedJudgeSlot = found ? found.id : empCode;
     }
 
-    const userRole = empRecord.role === "hr" ? "hr" : empRecord.role === "hod" ? "hod" : "employee";
+    const userRole = empRole === "hr" ? "hr" : empRole === "hod" ? "hod" : "employee";
 
     const verifiedUser: AuthUser = {
       role: userRole,
-      name: empRecord.name,
-      code: empRecord.code,
-      unitId: empRecord.unitId,
-      designation: empRecord.designation || (userRole === "hr" ? "HR Admin" : userRole === "hod" ? "Department Head" : "Staff Member"),
+      name: empName,
+      code: empCode,
+      unitId: empUnitId,
+      designation:
+        empDesignation ||
+        (userRole === "hr" ? "HR Admin" : userRole === "hod" ? "Department Head" : "Staff Member"),
       isPanelJudge,
       judgeId: assignedJudgeSlot,
-      gender: empRecord.gender || "",
+      gender: roleDoc?.gender || "",
     };
 
     const cookieStore = await cookies();
@@ -110,6 +127,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, user: verifiedUser });
   } catch (error) {
-    return NextResponse.json({ error: "Database error during login verification." }, { status: 500 });
+    console.error("[POST /api/auth/login]", error);
+    return NextResponse.json(
+      { error: "Database error during login verification." },
+      { status: 500 }
+    );
   }
 }

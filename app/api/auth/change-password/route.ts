@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import getPool, { sql } from "@/lib/mssql";
 import clientPromise from "@/lib/mongodb";
 import { AuthUser } from "@/lib/types";
 import { verifyPassword, hashPassword } from "@/lib/auth-utils";
+
+const TABLE = process.env.MSSQL_TABLE || "dbo.Employees";
 
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("rr_session");
 
-    if (!sessionCookie || !sessionCookie.value) {
+    if (!sessionCookie?.value) {
       return NextResponse.json(
         { error: "Unauthorized session. Please log in again." },
         { status: 401 }
@@ -17,28 +20,19 @@ export async function POST(request: Request) {
     }
 
     const currentUser: AuthUser = JSON.parse(sessionCookie.value);
-    if (!currentUser || !currentUser.code) {
-      return NextResponse.json(
-        { error: "Invalid user session profile." },
-        { status: 401 }
-      );
+    if (!currentUser?.code) {
+      return NextResponse.json({ error: "Invalid user session profile." }, { status: 401 });
     }
 
     const body = await request.json();
     const { currentPassword, newPassword, confirmPassword } = body;
 
-    if (!currentPassword || !currentPassword.trim()) {
-      return NextResponse.json(
-        { error: "Current password is required." },
-        { status: 400 }
-      );
+    if (!currentPassword?.trim()) {
+      return NextResponse.json({ error: "Current password is required." }, { status: 400 });
     }
 
-    if (!newPassword || !newPassword.trim()) {
-      return NextResponse.json(
-        { error: "New password is required." },
-        { status: 400 }
-      );
+    if (!newPassword?.trim()) {
+      return NextResponse.json({ error: "New password is required." }, { status: 400 });
     }
 
     if (newPassword.trim().length < 4) {
@@ -56,25 +50,31 @@ export async function POST(request: Request) {
     }
 
     const empCode = currentUser.code.trim().toUpperCase();
-    const client = await clientPromise;
-    const db = client.db();
 
-    const empRecord = await db.collection("employees").findOne({ code: empCode });
+    // 1. Fetch employee name from SSMS (needed for default password formula)
+    const pool = await getPool();
+    const req = pool.request();
+    req.input("emp_no", sql.NVarChar, empCode);
+    const ssmsResult = await req.query(
+      `SELECT DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no`
+    );
 
-    if (!empRecord) {
+    if (!ssmsResult.recordset.length) {
       return NextResponse.json(
         { error: `Employee record '${empCode}' not found in database.` },
         { status: 404 }
       );
     }
 
-    // Verify current password against database hash or computed formula
-    const isCurrentValid = verifyPassword(
-      currentPassword,
-      empRecord.passwordHash,
-      empRecord.code,
-      empRecord.name
-    );
+    const empName = String(ssmsResult.recordset[0].DisplayName || "").trim();
+
+    // 2. Fetch current password hash from MongoDB
+    const mongo = await clientPromise;
+    const db = mongo.db();
+    const pwDoc = await db.collection("emp_passwords").findOne({ code: empCode });
+
+    // 3. Verify current password
+    const isCurrentValid = verifyPassword(currentPassword, pwDoc?.passwordHash, empCode, empName);
 
     if (!isCurrentValid) {
       return NextResponse.json(
@@ -83,12 +83,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hash new password and update MongoDB
-    const newHash = hashPassword(newPassword);
-
-    await db.collection("employees").updateOne(
+    // 4. Save new password hash to MongoDB
+    const newHash = hashPassword(newPassword.trim());
+    await db.collection("emp_passwords").updateOne(
       { code: empCode },
-      { $set: { passwordHash: newHash, updatedAt: new Date() } }
+      { $set: { code: empCode, passwordHash: newHash, updatedAt: new Date() } },
+      { upsert: true }
     );
 
     return NextResponse.json({
@@ -96,6 +96,7 @@ export async function POST(request: Request) {
       message: "Password changed successfully! You can now log in with your new password.",
     });
   } catch (error) {
+    console.error("[POST /api/auth/change-password]", error);
     return NextResponse.json(
       { error: "Database error while updating password." },
       { status: 500 }
