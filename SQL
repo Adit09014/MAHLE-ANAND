@@ -1,0 +1,138 @@
+-- ============================================================
+--  PROJECT AWARD — Full Database Schema
+--  Run this script in SSMS on your company database
+--  Execute in order: Tables → Indexes → Initial Data
+-- ============================================================
+
+USE [YourDatabaseName];   -- ← CHANGE THIS to your actual database name
+GO
+
+-- ============================================================
+-- TABLE 1: Employees  (HR Master Directory — READ ONLY for app)
+-- If this table already exists with your HR data, SKIP this block.
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Employees'
+)
+BEGIN
+    CREATE TABLE dbo.Employees (
+        Emp_No          NVARCHAR(20)    NOT NULL,
+        DisplayName     NVARCHAR(100)   NOT NULL,
+        Work_Email      NVARCHAR(150)   NULL,
+        Department      NVARCHAR(100)   NULL,
+        Location        NVARCHAR(100)   NULL,
+        Designation     NVARCHAR(100)   NULL,
+        CONSTRAINT PK_Employees PRIMARY KEY (Emp_No)
+    );
+
+    PRINT 'Created table: dbo.Employees';
+END
+ELSE
+BEGIN
+    PRINT 'Skipped: dbo.Employees already exists';
+END
+GO
+
+-- ============================================================
+-- TABLE 2: EmpRoles  (App-specific: role & panel judge flags)
+-- Stores which employees are HR, HOD, Panel Judges, etc.
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'EmpRoles'
+)
+BEGIN
+    CREATE TABLE dbo.EmpRoles (
+        Emp_No          NVARCHAR(20)    NOT NULL,
+        Role            NVARCHAR(20)    NOT NULL DEFAULT 'employee',
+            -- Allowed values: 'employee' | 'hod' | 'hr' | 'judge'
+        IsPanelJudge    BIT             NOT NULL DEFAULT 0,
+        Gender          NVARCHAR(10)    NULL,
+        UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT PK_EmpRoles PRIMARY KEY (Emp_No),
+        CONSTRAINT FK_EmpRoles_Employees
+            FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
+            ON DELETE CASCADE
+    );
+
+    PRINT 'Created table: dbo.EmpRoles';
+END
+ELSE
+BEGIN
+    PRINT 'Skipped: dbo.EmpRoles already exists';
+END
+GO
+
+-- ============================================================
+-- TABLE 3: EmpPasswords  (Custom password hashes — SHA-256)
+-- Only exists for employees who changed their default password.
+-- If no row exists → app falls back to default password formula.
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+    WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'EmpPasswords'
+)
+BEGIN
+    CREATE TABLE dbo.EmpPasswords (
+        Emp_No          NVARCHAR(20)    NOT NULL,
+        PasswordHash    NVARCHAR(64)    NOT NULL,   -- SHA-256 hex string (64 chars)
+        UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT PK_EmpPasswords PRIMARY KEY (Emp_No),
+        CONSTRAINT FK_EmpPasswords_Employees
+            FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
+            ON DELETE CASCADE
+    );
+
+    PRINT 'Created table: dbo.EmpPasswords';
+END
+ELSE
+BEGIN
+    PRINT 'Skipped: dbo.EmpPasswords already exists';
+END
+GO
+
+-- ============================================================
+-- INDEXES (for faster lookups)
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_EmpRoles_Role')
+    CREATE INDEX IX_EmpRoles_Role ON dbo.EmpRoles (Role);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employees_Department')
+    CREATE INDEX IX_Employees_Department ON dbo.Employees (Department);
+GO
+
+PRINT 'Indexes created.';
+GO
+
+-- ============================================================
+-- VERIFY — Check all tables were created
+-- ============================================================
+SELECT
+    TABLE_NAME,
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS c
+     WHERE c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = 'dbo') AS ColumnCount
+FROM INFORMATION_SCHEMA.TABLES t
+WHERE TABLE_SCHEMA = 'dbo'
+  AND TABLE_NAME IN ('Employees', 'EmpRoles', 'EmpPasswords')
+ORDER BY TABLE_NAME;
+GO
+
+-- ============================================================
+-- INITIAL DATA — Assign first HR Admin
+-- Replace M1001 with your actual Emp_No
+-- ============================================================
+/*
+MERGE dbo.EmpRoles AS target
+USING (VALUES ('M1001', 'hr', 0)) AS source (Emp_No, Role, IsPanelJudge)
+ON target.Emp_No = source.Emp_No
+WHEN MATCHED THEN
+    UPDATE SET Role = source.Role, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+WHEN NOT MATCHED THEN
+    INSERT (Emp_No, Role, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsPanelJudge);
+*/
+-- ↑ Uncomment the block above and replace 'M1001' with your HR Admin's Emp_No, then run.
+
+PRINT '=== Schema setup complete ===';
+GO
