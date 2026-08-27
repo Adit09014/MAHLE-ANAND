@@ -187,3 +187,26 @@ GO
 -- 3. Explicitly grant permissions on the dbo schema
 GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo TO [Rewards];
 GO
+
+
+
+-- DOMAIN
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  serverExternalPackages: ["msnodesqlv8", "mssql"],
+  async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "https://rewards.yourdomain.com" },
+          { key: "Access-Control-Allow-Methods", value: "GET,POST,PUT,DELETE,OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
