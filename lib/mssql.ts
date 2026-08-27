@@ -63,11 +63,14 @@ export async function getPool(): Promise<sqlTedious.ConnectionPool> {
       instanceName = parts[1] || undefined;
     }
 
+    const user = (process.env.MSSQL_USER || "").trim().replace(/^["']|["']$/g, "");
+    const password = (process.env.MSSQL_PASSWORD || "").trim().replace(/^["']|["']$/g, "");
+
     const config: sqlTedious.config = {
       server: serverHost,
       database,
-      user: process.env.MSSQL_USER || "",
-      password: process.env.MSSQL_PASSWORD || "",
+      user,
+      password,
       port: process.env.MSSQL_PORT ? parseInt(process.env.MSSQL_PORT, 10) : undefined,
       options: {
         encrypt: process.env.MSSQL_ENCRYPT === "true",

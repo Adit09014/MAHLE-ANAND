@@ -10,7 +10,7 @@ export async function GET() {
     MSSQL_DATABASE: process.env.MSSQL_DATABASE || "(not set)",
     MSSQL_TABLE: process.env.MSSQL_TABLE || "(not set)",
     MSSQL_TRUSTED_CONNECTION: process.env.MSSQL_TRUSTED_CONNECTION || "(not set)",
-    MSSQL_USER: process.env.MSSQL_USER ? "(set)" : "(not set)",
+    MSSQL_USER: process.env.MSSQL_USER || "(not set)",
     MSSQL_PASSWORD: process.env.MSSQL_PASSWORD ? "(set)" : "(not set)",
   };
 
