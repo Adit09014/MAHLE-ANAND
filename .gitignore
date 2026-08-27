@@ -38,9 +38,7 @@ yarn-error.log*
 .env.production
 .env*.local
 
-# toy data & seed scripts
-scripts/
-scripts/*
+
 
 # vercel
 .vercel
