@@ -165,3 +165,25 @@ GO
 
 PRINT '=== Setup complete — Database Rewards and 6 Tables Ready ===';
 GO
+
+
+
+
+USE [Rewards];
+GO
+
+-- 1. Map login 'Rewards' to the database user 'Rewards' (if not already mapped)
+IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = N'Rewards')
+BEGIN
+    CREATE USER [Rewards] FOR LOGIN [Rewards];
+END
+GO
+
+-- 2. Grant Read & Write permissions on the entire Rewards database
+ALTER ROLE db_datareader ADD MEMBER [Rewards];
+ALTER ROLE db_datawriter ADD MEMBER [Rewards];
+GO
+
+-- 3. Explicitly grant permissions on the dbo schema
+GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo TO [Rewards];
+GO
