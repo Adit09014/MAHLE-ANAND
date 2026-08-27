@@ -400,6 +400,7 @@ export default function RRAdmin() {
                   cycle={cycle}
                   commit={commit}
                   locked={locked}
+                  readOnly={currentUser?.role === "hr"}
                 />
               )}
               {activeRole === "judge" && (

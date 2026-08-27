@@ -128,6 +128,66 @@ export const HrView: React.FC<HrViewProps> = ({
   const [addSaving, setAddSaving] = useState(false);
   const [addMsg, setAddMsg] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
+  // Quick HOD Assignment Modal States
+  const [assignHodUnitId, setAssignHodUnitId] = useState<string | null>(null);
+  const [assignHodEmpCode, setAssignHodEmpCode] = useState<string>("");
+  const [assignHodSearch, setAssignHodSearch] = useState<string>("");
+  const [assignHodPassword, setAssignHodPassword] = useState<string>("");
+  const [assignHodError, setAssignHodError] = useState<string | null>(null);
+  const [assignHodSaving, setAssignHodSaving] = useState<boolean>(false);
+  const [assignHodSuccess, setAssignHodSuccess] = useState<string | null>(null);
+
+  const handleAssignHodSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignHodUnitId || !assignHodEmpCode) {
+      setAssignHodError("Please select an employee to assign as HOD.");
+      return;
+    }
+    if (!assignHodPassword.trim()) {
+      setAssignHodError("Admin password is required to save changes.");
+      return;
+    }
+
+    setAssignHodSaving(true);
+    setAssignHodError(null);
+
+    const targetEmp = allEmployees.find((emp) => emp.code === assignHodEmpCode);
+
+    try {
+      const res = await fetch("/api/employees", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: assignHodEmpCode,
+          unitId: assignHodUnitId,
+          role: "hod",
+          isHOD: true,
+          adminPassword: assignHodPassword.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      setAssignHodSaving(false);
+
+      if (!res.ok) {
+        setAssignHodError(data.error || "Failed to assign HOD.");
+      } else {
+        const unitName = unitById(assignHodUnitId)?.name || assignHodUnitId;
+        setAssignHodSuccess(`${targetEmp?.name || assignHodEmpCode} assigned as HOD for ${unitName}!`);
+        fetchEmployees();
+        setTimeout(() => {
+          setAssignHodUnitId(null);
+          setAssignHodEmpCode("");
+          setAssignHodPassword("");
+          setAssignHodSuccess(null);
+        }, 1200);
+      }
+    } catch (err) {
+      setAssignHodSaving(false);
+      setAssignHodError("Network error while assigning HOD.");
+    }
+  };
+
   const fetchEmployees = async () => {
     setEmpLoading(true);
     try {
@@ -968,18 +1028,17 @@ export const HrView: React.FC<HrViewProps> = ({
               HOD Management — Assign Heads of Department
             </h3>
             <p className="mt-1 text-xs text-blue-900/60">
-              Employees marked as HOD gain access to the HOD Endorsement panel. One HOD per department is recommended.
-              Use the Employee Directory below to set <strong>IsHOD</strong> on any employee.
+              Each department can have <strong>only one HOD</strong>. Select any department below to assign or change its Head of Department.
             </p>
           </div>
-          <Pill tone="good">HR Admin Only</Pill>
+          <Pill tone="good">1 HOD Per Dept Enforced</Pill>
         </div>
 
         <div className="mt-5 overflow-x-auto rounded-xl border border-blue-900/10">
           <table className="w-full text-xs">
             <thead className="bg-blue-900/5 text-blue-900/70 font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="px-4 py-3 text-left">Department</th>
+                <th className="px-4 py-3 text-left">Department / Unit</th>
                 <th className="px-4 py-3 text-left">Current HOD</th>
                 <th className="px-4 py-3 text-left">Emp Code</th>
                 <th className="px-4 py-3 text-left">Designation</th>
@@ -987,37 +1046,71 @@ export const HrView: React.FC<HrViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-blue-900/10 bg-white">
-              {(() => {
-                // Group HODs by department
-                const hods = allEmployees.filter((e) => e.isHOD || e.role === "hod");
-                if (hods.length === 0) {
-                  return (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-blue-900/40 italic">
-                        No HODs assigned yet. Edit any employee below and toggle &quot;Mark as HOD&quot; to assign them.
-                      </td>
-                    </tr>
-                  );
-                }
-                return hods.map((hod) => (
-                  <tr key={hod.code} className="hover:bg-blue-50/40 transition">
-                    <td className="px-4 py-3 font-semibold text-blue-950">
-                      {unitById(hod.unitId)?.name || hod.unitId}
+              {UNITS.map((unit) => {
+                const currentHod = allEmployees.find(
+                  (e) => e.unitId === unit.id && (e.isHOD || e.role === "hod")
+                );
+
+                return (
+                  <tr key={unit.id} className="hover:bg-blue-50/40 transition">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-blue-950">{unit.name}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
+                          {unit.kind}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 font-medium text-blue-950">{hod.name}</td>
-                    <td className="px-4 py-3 font-mono text-blue-900/70">{hod.code}</td>
-                    <td className="px-4 py-3 text-blue-900/60">{hod.designation || "—"}</td>
+                    <td className="px-4 py-3 font-medium text-blue-950">
+                      {currentHod ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-950 text-[10px] font-extrabold text-white">
+                            {currentHod.name.charAt(0)}
+                          </div>
+                          <span>{currentHod.name}</span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200">
+                          <AlertTriangle size={12} /> No HOD Assigned
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-blue-900/70">
+                      {currentHod?.code || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-blue-900/60">
+                      {currentHod?.designation || "—"}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => openEditModal(hod)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-semibold text-blue-900 hover:bg-blue-50 transition active:scale-95 shadow-2xs"
+                        onClick={() => {
+                          setAssignHodUnitId(unit.id);
+                          setAssignHodEmpCode(currentHod?.code || "");
+                          setAssignHodSearch("");
+                          setAssignHodPassword("");
+                          setAssignHodError(null);
+                          setAssignHodSuccess(null);
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition active:scale-95 shadow-2xs ${
+                          currentHod
+                            ? "border-blue-900/20 bg-white text-blue-900 hover:bg-blue-50"
+                            : "border-blue-700 bg-blue-900 text-white hover:bg-blue-800"
+                        }`}
                       >
-                        <Edit3 size={13} /> Edit / Remove HOD
+                        {currentHod ? (
+                          <>
+                            <Edit3 size={13} /> Change HOD
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus size={13} /> Assign HOD
+                          </>
+                        )}
                       </button>
                     </td>
                   </tr>
-                ));
-              })()}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1661,6 +1754,28 @@ export const HrView: React.FC<HrViewProps> = ({
                 </div>
               </div>
 
+              {/* Notice if replacing existing HOD of department */}
+              {(() => {
+                if (!editIsHOD && editRole !== "hod") return null;
+                const existingHodInDept = allEmployees.find(
+                  (e) => e.unitId === editUnitId && (e.isHOD || e.role === "hod") && e.code !== editingEmp?.code
+                );
+                if (!existingHodInDept) return null;
+                const deptName = unitById(editUnitId)?.name || editUnitId;
+
+                return (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
+                    <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-bold text-amber-950">Notice: 1 HOD per Department Rule</strong>
+                      <p className="text-[11px] mt-0.5">
+                        Setting this employee as HOD will automatically replace <strong>{existingHodInDept.name} ({existingHodInDept.code})</strong> as the HOD of <strong>{deptName}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -1850,6 +1965,157 @@ export const HrView: React.FC<HrViewProps> = ({
                   className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-red-700"
                 >
                   {deleteSaving ? "Deleting..." : "Confirm & Delete"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Quick HOD Assignment Modal */}
+      {assignHodUnitId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-blue-950/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-blue-900/20 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-blue-900/10 pb-4">
+              <div>
+                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-blue-900">
+                  {unitById(assignHodUnitId)?.kind || "Department"}
+                </span>
+                <h3 className="text-lg font-extrabold text-blue-950 mt-1">
+                  Assign Head of Department — {unitById(assignHodUnitId)?.name || assignHodUnitId}
+                </h3>
+              </div>
+              <button
+                onClick={() => setAssignHodUnitId(null)}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {assignHodError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{assignHodError}</span>
+              </div>
+            )}
+
+            {assignHodSuccess && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+                <CheckCircle2 size={15} className="shrink-0" />
+                <span>{assignHodSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAssignHodSubmit} className="space-y-4">
+              <div>
+                <Label>Select Employee to Assign as HOD</Label>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-3 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search employee by name or code..."
+                      value={assignHodSearch}
+                      onChange={(e) => setAssignHodSearch(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 py-2 text-xs text-blue-950 focus:bg-white focus:border-blue-700 outline-none"
+                    />
+                  </div>
+
+                  <select
+                    required
+                    value={assignHodEmpCode}
+                    onChange={(e) => setAssignHodEmpCode(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">-- Choose Employee --</option>
+                    {allEmployees
+                      .filter(
+                        (emp) =>
+                          !assignHodSearch.trim() ||
+                          emp.name.toLowerCase().includes(assignHodSearch.toLowerCase()) ||
+                          emp.code.toLowerCase().includes(assignHodSearch.toLowerCase())
+                      )
+                      .map((emp) => {
+                        const isCurrentHodOfThisDept =
+                          emp.unitId === assignHodUnitId && (emp.isHOD || emp.role === "hod");
+                        const deptName = unitById(emp.unitId)?.name || emp.unitId;
+                        return (
+                          <option key={emp.code} value={emp.code}>
+                            {emp.name} ({emp.code}) — {deptName} {isCurrentHodOfThisDept ? "★ Current HOD" : ""}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+              </div>
+
+              {/* Warning Notice if replacing an existing HOD */}
+              {(() => {
+                const currentDeptHod = allEmployees.find(
+                  (e) => e.unitId === assignHodUnitId && (e.isHOD || e.role === "hod")
+                );
+                const selectedEmp = allEmployees.find((e) => e.code === assignHodEmpCode);
+
+                if (currentDeptHod && selectedEmp && selectedEmp.code !== currentDeptHod.code) {
+                  return (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                        <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                        <span>HOD Replacement Notice</span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed">
+                        Assigning <strong>{selectedEmp.name}</strong> will make them HOD of{" "}
+                        <strong>{unitById(assignHodUnitId)?.name}</strong>. The current HOD{" "}
+                        <strong>{currentDeptHod.name} ({currentDeptHod.code})</strong> will be demoted back to Employee.
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (selectedEmp && selectedEmp.unitId !== assignHodUnitId) {
+                  return (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                      <p className="text-[11px]">
+                        <strong>{selectedEmp.name}</strong> is currently assigned to department{" "}
+                        <strong>{unitById(selectedEmp.unitId)?.name || selectedEmp.unitId}</strong>. Their department will be updated to{" "}
+                        <strong>{unitById(assignHodUnitId)?.name}</strong>.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+
+              <div>
+                <Label>Admin Confirmation Password</Label>
+                <div className="relative">
+                  <Key size={14} className="absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="Enter your Admin password to confirm"
+                    value={assignHodPassword}
+                    onChange={(e) => setAssignHodPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2.5 text-xs text-blue-950 focus:border-blue-700 outline-none shadow-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAssignHodUnitId(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={assignHodSaving || !assignHodEmpCode}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-900 px-5 py-2 text-xs font-bold text-white hover:bg-blue-800 transition disabled:opacity-50 shadow-sm"
+                >
+                  {assignHodSaving ? "Assigning HOD…" : "Confirm HOD Assignment"}
                 </button>
               </div>
             </form>

@@ -101,21 +101,20 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { code, role, isPanelJudge } = body;
+    const { code, role, isPanelJudge, isHOD, unitId, gender } = body;
 
     if (!code) {
       return NextResponse.json({ error: "Employee code is required." }, { status: 400 });
     }
 
     const empCode = code.trim().toUpperCase();
-    const { isHOD } = body;
     const pool = await getPool();
 
     // Verify the employee exists in dbo.Employees
     const checkReq = pool.request();
     checkReq.input("emp_no", sql.NVarChar, empCode);
     const check = await checkReq.query(
-      `SELECT Emp_No FROM ${TABLE} WHERE Emp_No = @emp_no`
+      `SELECT Emp_No, Department FROM ${TABLE} WHERE Emp_No = @emp_no`
     );
 
     if (!check.recordset.length) {
@@ -125,27 +124,55 @@ export async function POST(request: Request) {
       );
     }
 
-    // Derive role: IsHOD=1 always means 'hod'
-    const resolvedRole = isHOD ? "hod" : (role || "employee");
+    // Update Department if provided
+    if (unitId) {
+      const updateDeptReq = pool.request();
+      updateDeptReq.input("emp_no", sql.NVarChar, empCode);
+      updateDeptReq.input("department", sql.NVarChar, unitId);
+      await updateDeptReq.query(`UPDATE ${TABLE} SET Department = @department WHERE Emp_No = @emp_no`);
+    }
+
+    const isSettingHOD = Boolean(isHOD) || role === "hod";
+    const resolvedRole = isSettingHOD ? "hod" : (role || "employee");
+
+    // Single HOD Per Department Enforcement
+    if (isSettingHOD) {
+      const targetDept = unitId || check.recordset[0]?.Department;
+      if (targetDept) {
+        const clearHodReq = pool.request();
+        clearHodReq.input("department", sql.NVarChar, targetDept);
+        clearHodReq.input("emp_no", sql.NVarChar, empCode);
+        await clearHodReq.query(`
+          UPDATE r
+          SET r.IsHOD = 0,
+              r.Role = CASE WHEN r.Role = 'hod' THEN 'employee' ELSE r.Role END,
+              r.UpdatedAt = GETDATE()
+          FROM dbo.EmpRoles r
+          INNER JOIN ${TABLE} e ON r.Emp_No = e.Emp_No
+          WHERE e.Department = @department AND e.Emp_No <> @emp_no
+        `);
+      }
+    }
 
     // MERGE into dbo.EmpRoles (upsert)
     const upsertReq = pool.request();
     upsertReq.input("emp_no", sql.NVarChar, empCode);
     upsertReq.input("role", sql.NVarChar, resolvedRole);
-    upsertReq.input("isHOD", sql.Bit, isHOD ? 1 : 0);
+    upsertReq.input("isHOD", sql.Bit, isSettingHOD ? 1 : 0);
     upsertReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
+    upsertReq.input("gender", sql.NVarChar, gender || "");
 
     await upsertReq.query(`
       MERGE dbo.EmpRoles AS target
-      USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge)) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
+      USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge, @gender)) AS source (Emp_No, Role, IsHOD, IsPanelJudge, Gender)
       ON target.Emp_No = source.Emp_No
       WHEN MATCHED THEN
-        UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+        UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, Gender = source.Gender, UpdatedAt = GETDATE()
       WHEN NOT MATCHED THEN
-        INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
+        INSERT (Emp_No, Role, IsHOD, IsPanelJudge, Gender) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.Gender);
     `);
 
-    return NextResponse.json({ ok: true, employee: { code: empCode, role: resolvedRole, isHOD, isPanelJudge } });
+    return NextResponse.json({ ok: true, employee: { code: empCode, role: resolvedRole, isHOD: isSettingHOD, isPanelJudge } });
   } catch (error) {
     console.error("[POST /api/employees]", error);
     return NextResponse.json({ error: "Failed to update employee role." }, { status: 500 });
@@ -172,7 +199,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { code, role, isPanelJudge, isHOD, newPassword, resetPassword, adminPassword } = body;
+    const { code, role, isPanelJudge, isHOD, unitId, name, gender, newPassword, resetPassword, adminPassword } = body;
 
     if (!adminPassword?.trim()) {
       return NextResponse.json(
@@ -225,7 +252,7 @@ export async function PUT(request: Request) {
     const empReq = pool.request();
     empReq.input("emp_no", sql.NVarChar, empCode);
     const empResult = await empReq.query(`
-      SELECT DisplayName FROM ${TABLE} WHERE Emp_No = @emp_no
+      SELECT DisplayName, Department FROM ${TABLE} WHERE Emp_No = @emp_no
     `);
 
     if (!empResult.recordset.length) {
@@ -235,25 +262,63 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Update dbo.Employees fields (Department, DisplayName) if provided
+    if (unitId || name) {
+      const updateEmpReq = pool.request();
+      updateEmpReq.input("emp_no", sql.NVarChar, empCode);
+      const setClauses: string[] = [];
+      if (unitId) {
+        updateEmpReq.input("department", sql.NVarChar, unitId);
+        setClauses.push("Department = @department");
+      }
+      if (name) {
+        updateEmpReq.input("displayName", sql.NVarChar, name.trim());
+        setClauses.push("DisplayName = @displayName");
+      }
+      if (setClauses.length > 0) {
+        await updateEmpReq.query(`UPDATE ${TABLE} SET ${setClauses.join(", ")} WHERE Emp_No = @emp_no`);
+      }
+    }
+
     // Update dbo.EmpRoles if role/isHOD/isPanelJudge provided
     if (role !== undefined || isHOD !== undefined || isPanelJudge !== undefined) {
-      // IsHOD=1 always forces role to 'hod'
-      const resolvedRole = isHOD ? "hod" : (role || "employee");
+      const isSettingHOD = Boolean(isHOD) || role === "hod";
+      const resolvedRole = isSettingHOD ? "hod" : (role || "employee");
+
+      // Single HOD Per Department Enforcement
+      if (isSettingHOD) {
+        const targetDept = unitId || empResult.recordset[0]?.Department;
+        if (targetDept) {
+          const clearHodReq = pool.request();
+          clearHodReq.input("department", sql.NVarChar, targetDept);
+          clearHodReq.input("emp_no", sql.NVarChar, empCode);
+          await clearHodReq.query(`
+            UPDATE r
+            SET r.IsHOD = 0,
+                r.Role = CASE WHEN r.Role = 'hod' THEN 'employee' ELSE r.Role END,
+                r.UpdatedAt = GETDATE()
+            FROM dbo.EmpRoles r
+            INNER JOIN ${TABLE} e ON r.Emp_No = e.Emp_No
+            WHERE e.Department = @department AND e.Emp_No <> @emp_no
+          `);
+        }
+      }
 
       const roleReq = pool.request();
       roleReq.input("emp_no", sql.NVarChar, empCode);
       roleReq.input("role", sql.NVarChar, resolvedRole);
-      roleReq.input("isHOD", sql.Bit, isHOD ? 1 : 0);
+      roleReq.input("isHOD", sql.Bit, isSettingHOD ? 1 : 0);
       roleReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
+      roleReq.input("gender", sql.NVarChar, gender || "");
 
       await roleReq.query(`
         MERGE dbo.EmpRoles AS target
-        USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge)) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
+        USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge, @gender)) AS source (Emp_No, Role, IsHOD, IsPanelJudge, Gender)
         ON target.Emp_No = source.Emp_No
         WHEN MATCHED THEN
-          UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
+          UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, Gender = source.Gender, UpdatedAt = GETDATE()
         WHEN NOT MATCHED THEN
-          INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
+          INSERT (Emp_No, Role, IsHOD, IsPanelJudge, Gender) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.Gender);
       `);
     }
 

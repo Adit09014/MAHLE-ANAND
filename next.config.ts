@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ["msnodesqlv8", "mssql"],
 };
 
 export default nextConfig;

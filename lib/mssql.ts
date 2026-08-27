@@ -1,62 +1,76 @@
-import sql from "mssql";
+import sql from "mssql/msnodesqlv8";
 
 const isTrusted = process.env.MSSQL_TRUSTED_CONNECTION === "true";
 const rawServer = (process.env.MSSQL_SERVER || "localhost").trim();
+const database = (process.env.MSSQL_DATABASE || "").trim();
 
-let serverHost = rawServer;
-let instanceName: string | undefined = undefined;
+let config: sql.config;
 
-// Automatically split named instances like "INGG-MARUTIAPP\SQLEXPRESS"
-if (rawServer.includes("\\")) {
-  const parts = rawServer.split("\\");
-  serverHost = parts[0] || "localhost";
-  instanceName = parts[1];
-} else if (rawServer.includes("/")) {
-  const parts = rawServer.split("/");
-  serverHost = parts[0] || "localhost";
-  instanceName = parts[1];
+if (isTrusted) {
+  // Windows Authentication via msnodesqlv8 native driver
+  config = {
+    driver: "msnodesqlv8",
+    connectionString: `Driver={SQL Server};Server=${rawServer};Database=${database};Trusted_Connection=yes;`,
+    parseJSON: true,
+  } as unknown as sql.config;
+} else {
+  // SQL Server Authentication via Tedious / TCP
+  let serverHost = rawServer;
+  let instanceName: string | undefined = undefined;
+
+  if (rawServer.includes("\\")) {
+    const parts = rawServer.split("\\");
+    serverHost = parts[0] || "localhost";
+    instanceName = parts[1];
+  }
+
+  config = {
+    server: serverHost,
+    database,
+    user: process.env.MSSQL_USER || undefined,
+    password: process.env.MSSQL_PASSWORD || undefined,
+    options: {
+      encrypt: process.env.MSSQL_ENCRYPT === "true",
+      trustServerCertificate: true,
+      enableArithAbort: true,
+      ...(instanceName ? { instanceName } : {}),
+    },
+  };
 }
 
-const config: sql.config = {
-  server: serverHost,
-  database: process.env.MSSQL_DATABASE || "",
-  user: isTrusted ? undefined : (process.env.MSSQL_USER || undefined),
-  password: isTrusted ? undefined : (process.env.MSSQL_PASSWORD || undefined),
-  options: {
-    encrypt: process.env.MSSQL_ENCRYPT === "true", // true for Azure SQL
-    trustServerCertificate: true,                  // allow self-signed certs on local SSMS
-    enableArithAbort: true,
-    trustedConnection: isTrusted,                  // Windows Authentication
-    ...(instanceName ? { instanceName } : {}),     // Correctly pass named instance (e.g. SQLEXPRESS)
-  },
-};
-
-// Singleton pool for development hot-reload safety
 declare global {
   // eslint-disable-next-line no-var
   var _mssqlPool: sql.ConnectionPool | undefined;
 }
 
-async function getPool(): Promise<sql.ConnectionPool> {
+export async function getPool(): Promise<sql.ConnectionPool> {
   if (process.env.NODE_ENV === "development") {
     if (!global._mssqlPool || !global._mssqlPool.connected) {
       try {
         global._mssqlPool = await new sql.ConnectionPool(config).connect();
-      } catch (err: unknown) {
-        // If connecting via hostname fails and hostname is local machine, try localhost fallback
-        if (serverHost !== "localhost" && serverHost !== "127.0.0.1") {
-          const fallbackConfig: sql.config = {
-            ...config,
-            server: "localhost",
-          };
-          try {
-            global._mssqlPool = await new sql.ConnectionPool(fallbackConfig).connect();
-            return global._mssqlPool;
-          } catch {
-            // throw original error if fallback also fails
+        return global._mssqlPool;
+      } catch (primaryErr) {
+        if (isTrusted) {
+          const odbcDrivers = [
+            "ODBC Driver 17 for SQL Server",
+            "ODBC Driver 18 for SQL Server",
+            "SQL Server Native Client 11.0",
+          ];
+          for (const driver of odbcDrivers) {
+            try {
+              const tryConfig = {
+                driver: "msnodesqlv8",
+                connectionString: `Driver={${driver}};Server=${rawServer};Database=${database};Trusted_Connection=yes;`,
+                parseJSON: true,
+              } as unknown as sql.config;
+              global._mssqlPool = await new sql.ConnectionPool(tryConfig).connect();
+              return global._mssqlPool;
+            } catch {
+              /* ignore fallback */
+            }
           }
         }
-        throw err;
+        throw primaryErr;
       }
     }
     return global._mssqlPool;

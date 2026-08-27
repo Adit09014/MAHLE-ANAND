@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye } from "lucide-react";
 import { unitById, CATEGORIES, MAX_CATEGORIES_PER_UNIT, STAGES } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
@@ -16,9 +16,10 @@ export interface HodViewProps {
   commit: (next: Cycle) => void;
   unitId: string;
   locked: boolean;
+  readOnly?: boolean;
 }
 
-export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked }) => {
+export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked, readOnly = false }) => {
   const unit = unitById(unitId);
   const mine = cycle.nominations.filter((n) => n.unit === unitId);
   const picks = cycle.endorsed[unitId] || {};
@@ -29,6 +30,7 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked 
   const open = ["nomination", "validation"].includes(cycle.stage) && !locked;
 
   const toggle = (nom: Nomination) => {
+    if (readOnly) return;
     const next = { ...picks };
     if (next[nom.category] === nom.id) {
       delete next[nom.category];
@@ -45,6 +47,16 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked 
 
   return (
     <div className="space-y-5">
+      {/* Read-Only Notice Banner for HR Admin */}
+      {readOnly && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-sky-200 bg-sky-50 p-3.5 text-xs text-sky-950 font-semibold shadow-2xs">
+          <Eye size={17} className="text-sky-700 shrink-0" />
+          <span>
+            <strong>Read-Only Mode (HR Admin):</strong> You are inspecting HOD endorsements for {unit?.name || unitId}. Endorsements and withdrawals can only be performed by the designated Head of Department.
+          </span>
+        </div>
+      )}
+
       {/* Policy Guidance Banner */}
       <div className="rounded-xl border border-blue-900/15 bg-gradient-to-r from-blue-900/5 via-blue-900/10 to-blue-900/5 p-4 text-xs text-blue-950 shadow-sm">
         <div className="flex items-start gap-2.5">
@@ -158,13 +170,25 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked 
                       </p>
                     )}
                     <div className="mt-3">
-                      <Button
-                        tone={isPick ? "danger" : "solid"}
-                        onClick={() => toggle(n)}
-                        disabled={!open || (blocked && !isPick)}
-                      >
-                        {isPick ? "Withdraw endorsement" : "Endorse"}
-                      </Button>
+                      {readOnly ? (
+                        isPick ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 border border-emerald-300 px-3 py-1.5 text-xs font-extrabold text-emerald-900 shadow-2xs">
+                            <CheckCircle2 size={13} className="text-emerald-700" /> Endorsed by HOD (Read-Only)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                            <Lock size={12} className="text-slate-400" /> Read-Only Mode
+                          </span>
+                        )
+                      ) : (
+                        <Button
+                          tone={isPick ? "danger" : "solid"}
+                          onClick={() => toggle(n)}
+                          disabled={!open || (blocked && !isPick)}
+                        >
+                          {isPick ? "Withdraw endorsement" : "Endorse"}
+                        </Button>
+                      )}
                     </div>
                   </Card>
                 );

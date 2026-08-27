@@ -1,13 +1,24 @@
 -- ============================================================
---  PROJECT AWARD — Full Database Schema (100% SQL Server)
---  Run this script in SSMS on your company database
+--  PROJECT AWARD — Complete SQL Server Setup & Schema
+--  Run this script in SSMS to create Database, Tables, and Indexes
 -- ============================================================
 
-USE [YourDatabaseName];   -- ← CHANGE THIS to your actual database name
+-- 1. Create Rewards Database if not exists
+USE [master];
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = 'Rewards')
+BEGIN
+    CREATE DATABASE [Rewards];
+    PRINT 'Created database: Rewards';
+END
+GO
+
+USE [Rewards];
 GO
 
 -- ============================================================
--- TABLE 1: Employees  (HR Master Directory — READ ONLY for app)
+-- TABLE 1: Employees  (HR Master Directory)
 -- ============================================================
 IF NOT EXISTS (
     SELECT 1 FROM INFORMATION_SCHEMA.TABLES
@@ -152,61 +163,5 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Employees_Department')
     CREATE INDEX IX_Employees_Department ON dbo.Employees (Department);
 GO
 
-PRINT '=== Schema setup complete (6 tables ready) ===';
+PRINT '=== Setup complete — Database Rewards and 6 Tables Ready ===';
 GO
-
-# ─── App Settings ────────────────────────────────────────────────────────────
-HR_MASTER_PASSWORD=adminmahle1234
-
-# ─── SQL Server (SSMS) — 100% Database Provider ─────────────────────────────
-MSSQL_SERVER=INGG-MARUTIAPP\SQLEXPRESS
-MSSQL_DATABASE=Rewards
-MSSQL_TRUSTED_CONNECTION=true
-MSSQL_ENCRYPT=false
-MSSQL_TABLE=dbo.Employees
-
-
-#SQL
-USE [Rewards];
-GO
-
--- 1. Insert 3 Employees
-IF NOT EXISTS (SELECT 1 FROM dbo.Employees WHERE Emp_No = 'M1001')
-    INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
-    VALUES ('M1001', 'Aditya Kumar', 'aditya.kumar@mahle.com', 'hr', 'Gurgaon', 'HR Manager');
-
-IF NOT EXISTS (SELECT 1 FROM dbo.Employees WHERE Emp_No = 'M1002')
-    INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
-    VALUES ('M1002', 'Vikram Singh', 'vikram.singh@mahle.com', 'rnd', 'Gurgaon', 'R&D Manager');
-
-IF NOT EXISTS (SELECT 1 FROM dbo.Employees WHERE Emp_No = 'M1003')
-    INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
-    VALUES ('M1003', 'Priya Sharma', 'priya.sharma@mahle.com', 'fin', 'Gurgaon', 'Finance Executive');
-GO
-
--- 2. Assign Roles (1 HR Admin, 1 HOD, 1 Employee)
-MERGE dbo.EmpRoles AS target
-USING (
-    VALUES 
-        ('M1001', 'hr',  0, 0),     -- M1001: HR Admin
-        ('M1002', 'hod', 1, 1),     -- M1002: HOD (R&D) + Panel Judge
-        ('M1003', 'employee', 0, 0) -- M1003: Staff Member
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge)
-ON target.Emp_No = source.Emp_No
-WHEN MATCHED THEN
-    UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, UpdatedAt = GETDATE()
-WHEN NOT MATCHED THEN
-    INSERT (Emp_No, Role, IsHOD, IsPanelJudge) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge);
-GO
-
--- 3. Verify & Display Credentials
-SELECT
-    e.Emp_No                        AS [Employee_Code],
-    e.DisplayName                   AS [Full_Name],
-    ISNULL(r.Role, 'employee')      AS [Portal_Role],
-    RIGHT(e.Emp_No, 4) + LEFT(REPLACE(e.DisplayName, ' ', ''), 4) AS [Default_Password]
-FROM dbo.Employees e
-LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
-WHERE e.Emp_No IN ('M1001', 'M1002', 'M1003');
-GO
-
