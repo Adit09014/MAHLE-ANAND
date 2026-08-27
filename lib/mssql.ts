@@ -1,9 +1,5 @@
 import sqlTedious from "mssql";
 
-const isTrusted = process.env.MSSQL_TRUSTED_CONNECTION === "true";
-const rawServer = (process.env.MSSQL_SERVER || "localhost").trim();
-const database = (process.env.MSSQL_DATABASE || "").trim();
-
 export const sql = sqlTedious;
 
 declare global {
@@ -15,6 +11,10 @@ export async function getPool(): Promise<sqlTedious.ConnectionPool> {
   if (global._mssqlPool && global._mssqlPool.connected) {
     return global._mssqlPool;
   }
+
+  const isTrusted = process.env.MSSQL_TRUSTED_CONNECTION === "true";
+  const rawServer = (process.env.MSSQL_SERVER || "localhost").trim();
+  const database = (process.env.MSSQL_DATABASE || "").trim();
 
   if (isTrusted) {
     // Windows Authentication via msnodesqlv8 native driver
@@ -53,13 +53,14 @@ export async function getPool(): Promise<sqlTedious.ConnectionPool> {
     }
   } else {
     // SQL Server Authentication via Tedious / TCP (Username + Password)
-    let serverHost = rawServer;
+    const normalizedServer = rawServer.replace(/\\+/g, "\\");
+    let serverHost = normalizedServer;
     let instanceName: string | undefined = undefined;
 
-    if (rawServer.includes("\\")) {
-      const parts = rawServer.split("\\");
+    if (normalizedServer.includes("\\")) {
+      const parts = normalizedServer.split("\\").filter(Boolean);
       serverHost = parts[0] || "localhost";
-      instanceName = parts[1];
+      instanceName = parts[1] || undefined;
     }
 
     const config: sqlTedious.config = {
@@ -76,11 +77,17 @@ export async function getPool(): Promise<sqlTedious.ConnectionPool> {
       },
     };
 
-    global._mssqlPool = await new sqlTedious.ConnectionPool(config).connect();
-    return global._mssqlPool!;
+    try {
+      global._mssqlPool = await new sqlTedious.ConnectionPool(config).connect();
+      return global._mssqlPool!;
+    } catch (err) {
+      global._mssqlPool = undefined;
+      throw err;
+    }
   }
 }
 
 export default getPool;
+
 
 

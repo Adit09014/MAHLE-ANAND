@@ -52,12 +52,13 @@ async function testConnection() {
       };
       pool = await new sqlNative.ConnectionPool(config).connect();
     } else {
-      let serverHost = rawServer;
+      const normalizedServer = rawServer.replace(/\\+/g, "\\");
+      let serverHost = normalizedServer;
       let instanceName = undefined;
-      if (rawServer.includes("\\")) {
-        const parts = rawServer.split("\\");
+      if (normalizedServer.includes("\\")) {
+        const parts = normalizedServer.split("\\").filter(Boolean);
         serverHost = parts[0] || "localhost";
-        instanceName = parts[1];
+        instanceName = parts[1] || undefined;
       }
 
       const config = {
