@@ -18,8 +18,8 @@ export async function getPool(): Promise<sqlTedious.ConnectionPool> {
 
   if (isTrusted) {
     // Windows Authentication via msnodesqlv8 native driver
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sqlNative = require("mssql/msnodesqlv8.js");
+    const sqlNativeModule = await import("mssql/msnodesqlv8.js");
+    const sqlNative = sqlNativeModule.default || sqlNativeModule;
 
     const config = {
       driver: "msnodesqlv8",
@@ -82,4 +82,5 @@ export async function getPool(): Promise<sqlTedious.ConnectionPool> {
 }
 
 export default getPool;
+
 
