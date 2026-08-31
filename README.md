@@ -34,3 +34,22 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+:: 1. Install PM2 & Windows startup wrapper
+npm install -g pm2 pm2-windows-startup
+
+:: 2. Register PM2 as a Windows background service
+pm2-windows-startup install
+
+:: 3. Go to your app directory
+cd /d "d:\ADIT\PROJECT AWARD\my-app"
+
+:: 4. Build the application for production
+npm run build
+
+:: 5. Start the app in background with PM2
+pm2 start npm --name "project-award" -- start
+
+:: 6. Save the state so PM2 restarts it automatically on system reboot
+pm2 save
