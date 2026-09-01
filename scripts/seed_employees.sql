@@ -1,16 +1,13 @@
--- ============================================================
---  PROJECT AWARD — Bulk Employee Seeding Script
---  Inserts/Updates all 170+ employee records into dbo.Employees & dbo.EmpRoles
--- ============================================================
-
+-- ====================================================================
+-- FULL BULK EMPLOYEE SEED SCRIPT FOR MAHLE ANAND FILTER SYSTEM
+-- Generated directly from User CSV (Total Records: 338)
+-- ====================================================================
 USE [Rewards];
 GO
 
 SET NOCOUNT ON;
 
-PRINT 'Starting bulk employee seed process...';
-
--- 1. Insert / Update dbo.Employees Records
+-- 1. Upsert Employee Records
 MERGE dbo.Employees AS target
 USING (VALUES
   (N'001332', N'Shekhar Kanifnath Khedekar', N'shekhar.khedekar@mahle.com', N'Production', N'PUNE', N'Asst. Manager'),
@@ -22,7 +19,7 @@ USING (VALUES
   (N'001693', N'Writusree Das', N'writushree.a.das@mahle.com', N'Supply Chain', N'PUNE', N'Sr. Engineer'),
   (N'001729', N'Vinesh Kumar Jha', N'vinesh.jha@mahle.com', N'Production', N'PUNE', N'Engineer'),
   (N'001754', N'Samanta Arindam', N'samanta.arindam@mahle.com', N'Central Quality', N'PUNE', N'Sr. Engineer'),
-  (N'001806', N'Jitendra Kumar', NULL, N'Maintenance', N'CHENNAI', N'Engineer'),
+  (N'001806', N'Jitendra Kumar', N'', N'Maintenance', N'CHENNAI', N'Engineer'),
   (N'001825', N'Jogdand Shuddhodhan Yashwant', N'shuddhodhan.jogdand@mahle.com', N'Production', N'PUNE', N'Engineer'),
   (N'001828', N'Rajesh Chandrakant Mahangare', N'rajesh.mahangare@mahle.com', N'Maintenance', N'PUNE', N'Engineer'),
   (N'001914', N'Prakash Kumar', N'prakash.a.kumar@mahle.com', N'Engineering (R&D)', N'PUNE', N'Engineer'),
@@ -91,31 +88,31 @@ USING (VALUES
   (N'1108', N'Shyam Babu S', N'shyambabu.s@mahle.com', N'Quality', N'CHENNAI', N'Asst. Manager'),
   (N'1109', N'Mareeswaran T', N'mareeswaran.t@mahle.com', N'HR', N'CHENNAI', N'Manager'),
   (N'1110', N'Arun kumar R', N'arunkumar.r@mahle.com', N'Safety', N'CHENNAI', N'Sr. Engineer'),
-  (N'1112', N'Keerthivel', NULL, N'Tooling', N'CHENNAI', N'Engineer'),
+  (N'1112', N'Keerthivel', N'', N'Tooling', N'CHENNAI', N'Engineer'),
   (N'1113', N'Godha Yeshwanth Goud', N'yeshwanth.a.goud@mahle.com', N'Process Engineering', N'CHENNAI', N'Senior Engineer'),
   (N'1114', N'Nancy Y', N'nancy.y@mahle.com', N'HR', N'CHENNAI', N'Assistant Manager'),
-  (N'1116', N'Vinayagam V', NULL, N'Maintenance', N'CHENNAI', N'Engineer'),
-  (N'1117', N'Srinivasan Lakshmanaperumal', NULL, N'Process Engineering', N'CHENNAI', N'Sr. Engineer'),
-  (N'1118', N'Rahuman N', NULL, N'Maintenance', N'CHENNAI', N'Engineer'),
+  (N'1116', N'Vinayagam V', N'', N'Maintenance', N'CHENNAI', N'Engineer'),
+  (N'1117', N'Srinivasan Lakshmanaperumal', N'', N'Process Engineering', N'CHENNAI', N'Sr. Engineer'),
+  (N'1118', N'Rahuman N', N'', N'Maintenance', N'CHENNAI', N'Engineer'),
   (N'1119', N'Mikhail Prabhudas N', N'mikhailprabhudas.n@mahle.com', N'Quality', N'CHENNAI', N'Assistant Manager'),
   (N'1120', N'Jeyavelu N', N'jeyavelu.n@mahle.com', N'Maintenance', N'CHENNAI', N'Assistant Manager'),
   (N'1121', N'Sathish Kumar', N'sathishkumar.b@mahle.com', N'Quality', N'CHENNAI', N'Assistant Manager'),
   (N'1122', N'Vivin TS', N'vivin.ts@mahle.com', N'Process Engineering', N'CHENNAI', N'Assistant Manager'),
-  (N'1123', N'Murugananthan A', NULL, N'Maintenance', N'CHENNAI', N'Senior Engineer'),
+  (N'1123', N'Murugananthan A', N'', N'Maintenance', N'CHENNAI', N'Senior Engineer'),
   (N'6007', N'R Kumaresan', N'kumaresan.ramachandran@mahle.com', N'Quality', N'CHENNAI', N'Manager'),
   (N'6009', N'Kulandai Veeramakali R', N'veera.rajendran@mahle.com', N'Supply Chain', N'CHENNAI', N'Sr. Engineer'),
   (N'6074', N'G Anitha', N'anitha.ganesan@mahle.com', N'Supply Chain', N'CHENNAI', N'Engineer'),
   (N'6096', N'Praveen Kumar', N'Praveenkumar.Selvaraj@mahle.com', N'Tooling', N'CHENNAI', N'Engineer'),
   (N'6126', N'Korapati Yesanna', N'korapati.yesanna@mahle.com', N'Quality', N'CHENNAI', N'Engineer'),
   (N'6139', N'Subramani', N'subramani.shanmugavel@mahle.com', N'Production', N'CHENNAI', N'Sr. Engineer'),
-  (N'6165', N'M.Rathinavel', NULL, N'Production', N'CHENNAI', N'Engineer'),
+  (N'6165', N'M.Rathinavel', N'', N'Production', N'CHENNAI', N'Engineer'),
   (N'6187', N'Sasikumar Marimuthu', N'Sasikumar.Marimuthu@mahle.com', N'Quality', N'CHENNAI', N'Engineer'),
   (N'6215', N'Dibyendu chakraborty', N'Dibyendu.Chakraborty@mahle.com', N'Engineering (R&D)', N'PUNE', N'Engineer'),
   (N'8021', N'Asif Aziz TP', N'asif.aziz@mahle.com', N'Central Quality', N'Chennai-HO', N'Engineer'),
-  (N'8409', N'Sivaperumal', NULL, N'Production', N'CHENNAI', N'Engineer'),
-  (N'8411', N'Gokulakrishnan Sankar', NULL, N'Production', N'CHENNAI', N'Asst. Engineer'),
-  (N'8412', N'R Vignesh', NULL, N'Production', N'CHENNAI', N'Asst. Engineer'),
-  (N'8413', N'Shubhadip Jana', NULL, N'Production', N'CHENNAI', N'Asst. Engineer'),
+  (N'8409', N'Sivaperumal', N'', N'Production', N'CHENNAI', N'Engineer'),
+  (N'8411', N'Gokulakrishnan Sankar', N'', N'Production', N'CHENNAI', N'Asst. Engineer'),
+  (N'8412', N'R Vignesh', N'', N'Production', N'CHENNAI', N'Asst. Engineer'),
+  (N'8413', N'Shubhadip Jana', N'', N'Production', N'CHENNAI', N'Asst. Engineer'),
   (N'E20067', N'Laxmi Prakash Pradhan', N'laxmi.pradhan@mahle.com', N'Production', N'Parwanoo-1', N'DGM'),
   (N'E20070', N'Deepak Jangra', N'deepak.jangra@mahle.com', N'Central Quality', N'Head Office', N'AGM'),
   (N'E20089', N'Kamal Kumar Panda', N'kamal.panda@mahle.com', N'Central Process', N'CHENNAI', N'DGM'),
@@ -159,12 +156,13 @@ USING (VALUES
   (N'E50037', N'Naresh Kumar', N'naresh.kumar@mahle.com', N'Maintenance', N'Parwanoo-1', N'Manager'),
   (N'E50039', N'Puneet Kumar', N'puneet.a.kumar@mahle.com', N'Production', N'Khandsa', N'Sr. Engineer'),
   (N'E50045', N'Satish Kumar Bhardwaj', N'satish.bhardwaj@mahle.com', N'Production', N'Parwanoo-1', N'Sr. Engineer'),
-  (N'E50108', N'Jagbeer Singh', NULL, N'Production', N'Parwanoo-1', N'Engineer'),
+  (N'E50076', N'Arun Chauhan', N'arun.chauhan@mahle.com', N'Production', N'Parwanoo-1', N'Sr. Engineer'),
+  (N'E50108', N'Jagbeer Singh', N'', N'Production', N'Parwanoo-1', N'Engineer'),
   (N'E50135', N'Puneet Bhardwaj', N'Puneet.Bhardwaj@mahle.com', N'Production', N'Parwanoo-1', N'Engineer'),
-  (N'E50162', N'Shashi Kumar', NULL, N'Production', N'Parwanoo-1', N'Engineer'),
+  (N'E50162', N'Shashi Kumar', N'', N'Production', N'Parwanoo-1', N'Engineer'),
   (N'E50203', N'Yogesh Kumar', N'yogesh.kumar@mahle.com', N'Maintenance', N'Parwanoo-1', N'Sr. Engineer'),
   (N'E50278', N'Anil Sharma', N'puneet.a.kumar@mahle.com', N'Production', N'Khandsa', N'Engineer'),
-  (N'E50322', N'Sudhir Rai', NULL, N'Production', N'Khandsa', N'Engineer'),
+  (N'E50322', N'Sudhir Rai', N'', N'Production', N'Khandsa', N'Engineer'),
   (N'E50332', N'Deepak Sharma', N'deepak.c.sharma@mahle.com', N'Quality', N'Parwanoo-1', N'Engineer'),
   (N'E50396', N'Mandeep Agan', N'mandeep.a.agan@mahle.com', N'Quality', N'Khandsa', N'Engineer'),
   (N'E50432', N'Ankur', N'ankur.b.kumar@mahle.com', N'HR', N'Parwanoo-1', N'Asst. Manager'),
@@ -177,14 +175,13 @@ USING (VALUES
   (N'K01013', N'NARESH KUMAR', N'hrd.khd@mahle.com', N'Production', N'Khandsa', N'Engineer'),
   (N'K01028', N'SANGRAM KESHARI SAHOO', N'Sangramkeshari.Sahoo@mahle.com', N'Quality', N'CHENNAI', N'Engineer'),
   (N'K01030', N'Masibur Rahaman', N'Masibur.Rahaman@mahle.com', N'Maintenance', N'Khandsa', N'Assistant Manager'),
-  (N'K01069', N'SAHIL', NULL, N'Production', N'Parwanoo-1', N'Engineer'),
+  (N'K01069', N'SAHIL', N'', N'Production', N'Parwanoo-1', N'Engineer'),
   (N'K01104', N'Suneel Kumar', N'suneel.kumar@mahle.com', N'Supply Chain', N'Khandsa', N'Sr. Engineer'),
   (N'K01140', N'Rajat Kumar Chakrabarty', N'rajat.chakrabarty@mahle.com', N'After Market', N'Head Office', N'Sr. Engineer'),
   (N'K01144', N'Anil Tiwari', N'anil.tiwari@mahle.com', N'Central Quality', N'Head Office', N'GM'),
   (N'K01146', N'Ishan Arora', N'ishan.a.arora@mahle.com', N'Quality', N'Khandsa', N'Manager'),
   (N'K01149', N'Varun Rana', N'varun.rana@mahle.com', N'Quality', N'Khandsa', N'Asst. Manager'),
-  (N'K01151', N'Abhishek Tripathi', N'abhishek.tripathi@mahle.com', N'Quality', N'Khandsa', N'Manager'),
-  (N'K01152', N'Shammy Sharma', N'shammy.sharma@mahle.com', N'Central Quality', N'PUNE', N'Asst. Manager')
+  (N'K01151', N'Abhishek Tripathi', N'abhishek.tripathi@mahle.com', N'Quality', N'Khandsa', N'Manager')
 ) AS source (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
 ON target.Emp_No = source.Emp_No
 WHEN MATCHED THEN
@@ -196,18 +193,19 @@ GO
 
 MERGE dbo.Employees AS target
 USING (VALUES
+  (N'K01152', N'Shammy Sharma', N'shammy.sharma@mahle.com', N'Central Quality', N'PUNE', N'Asst. Manager'),
   (N'K01153', N'Tarun Kumar', N'tarun.b.kumar@mahle.com', N'Process Engineering', N'Khandsa', N'Asst. Manager'),
   (N'K01154', N'Rohan Mohata', N'rohan.mohata@mahle.com', N'Process Engineering', N'Khandsa', N'Sr. Engineer'),
   (N'K01162', N'Avaya Kumar Moharana', N'avayakumar.moharana@mahle.com', N'Process Engineering', N'Khandsa', N'Manager'),
   (N'K01163', N'Divya Akhouri', N'divya.akhouri@mahle.com', N'HR', N'Khandsa', N'Sr. Manager'),
   (N'K01164', N'Mantasha Zafar', N'mantasha.zafar@mahle.com', N'HR', N'Khandsa', N'Asst. Manager'),
-  (N'K01166', N'Vipin Singh Tomar', NULL, N'Maintenance', N'Khandsa', N'Engineer'),
+  (N'K01166', N'Vipin Singh Tomar', N'', N'Maintenance', N'Khandsa', N'Engineer'),
   (N'K01167', N'Ritesh Tiwari', N'ritesh.tiwari@mahle.com', N'Quality', N'Khandsa', N'Sr. Engineer'),
   (N'K01168', N'Rohit Yadav', N'rohit.a.yadav@mahle.com', N'HR', N'Khandsa', N'Assistant Manager'),
   (N'K01169', N'Vishal Singh', N'vishal.a.singh@mahle.com', N'Process Engineering', N'Khandsa', N'Assistant Manager'),
   (N'K01170', N'Rohit Bhatt', N'rohit.bhatt@mahle.com', N'Quality', N'Khandsa', N'Manager'),
   (N'K01171', N'Ajay Yadav', N'ajay.a.yadav@mahle.com', N'SCM', N'Khandsa', N'Sr. Executive'),
-  (N'K01172', N'Nitish Kumar', NULL, N'Process Engineering', N'Khandsa', N'Assistant Manager'),
+  (N'K01172', N'Nitish Kumar', N'', N'Process Engineering', N'Khandsa', N'Assistant Manager'),
   (N'K0350', N'Praveen Kumar', N'praveen.kumar@mahle.com', N'Purchase', N'Khandsa', N'Asst. Manager'),
   (N'K0378', N'Hari Gopal Singh', N'harigopal.singh@mahle.com', N'Production', N'Khandsa', N'Asst. Manager'),
   (N'K0407', N'Rajeshwar Kumar Nishad', N'rajeshwar.nishad@mahle.com', N'Supply Chain', N'Khandsa', N'Asst. Manager'),
@@ -241,11 +239,10 @@ USING (VALUES
   (N'K0920', N'ROHIT KUMAR SHARMA', N'rohit.sharma@mahle.com', N'Maintenance', N'Parwanoo-1', N'Sr. Engineer'),
   (N'K0927', N'AMIT KUMAR', N'hrd.khd@mahle.com', N'Production', N'Khandsa', N'Engineer'),
   (N'K0988', N'Gagandeep Singh', N'gagandeep.a.singh@mahle.com', N'Central Purchase', N'Head Office', N'Manager'),
-  (N'KA1092', N'Manju', NULL, N'Production', N'Khandsa', N'Engineer'),
-  (N'KA1112', N'Bhawana Singh', NULL, N'Production', N'Khandsa', N'GET'),
-  (N'KA1151', N'Sakshi Upadhyay', NULL, N'Production', N'Khandsa', N'GET'),
-  (N'KA1235', N'Gaurav', N'Gaurav.Pasrija@mahle.com', N'HR', N'Khandsa', N'Asst. Manager'),
-  (N'KH0083', N'Shalender Yadav', N'Shalender.yadav@mahle.com', N'Central Process', N'Head Office', N'GM')
+  (N'KA1092', N'Manju', N'', N'Production', N'Khandsa', N'Engineer'),
+  (N'KA1112', N'Bhawana Singh', N'', N'Production', N'Khandsa', N'GET'),
+  (N'KA1151', N'Sakshi Upadhyay', N'', N'Production', N'Khandsa', N'GET'),
+  (N'KA1235', N'Gaurav', N'Gaurav.Pasrija@mahle.com', N'HR', N'Khandsa', N'Asst. Manager')
 ) AS source (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
 ON target.Emp_No = source.Emp_No
 WHEN MATCHED THEN
@@ -257,6 +254,7 @@ GO
 
 MERGE dbo.Employees AS target
 USING (VALUES
+  (N'KH0083', N'Shalender Yadav', N'Shalender.yadav@mahle.com', N'Central Process', N'Head Office', N'GM'),
   (N'KH0109', N'Dharam Vir Mehra', N'dharamvir.mehra@mahle.com', N'Engineering (R&D)', N'Head Office', N'DGM'),
   (N'KH0130', N'Neeraj Kumar', N'neeraj.kumar@mahle.com', N'Engineering (R&D)', N'Head Office', N'Sr. Manager'),
   (N'KH0142', N'Mahender  KUMAR', N'mahender.kumar@mahle.com', N'Finance', N'Head Office', N'Executive'),
@@ -305,8 +303,7 @@ USING (VALUES
   (N'KH0527', N'Narender Khatri', N'narender.khatri@mahle.com', N'Engineering (R&D)', N'Head Office', N'Asst. Manager'),
   (N'KH0529', N'Senthilkumar Boominathan', N'Senthilkumar.Boominathan@mahle.com', N'Central Quality', N'Chennai-HO', N'Sr. Engineer'),
   (N'KH0531', N'Viral Rajulal Mali', N'viral.mali@mahle.com', N'Central Process', N'Head Office', N'Manager'),
-  (N'KH0532', N'Ramanujan G', N'ramanujan.g@mahle.com', N'Process Engineering', N'CHENNAI', N'Asst. Manager'),
-  (N'KH0535', N'Vaibhav Narendra Goel', N'vaibhav.a.goel@mahle.com', N'After Market', N'Head Office', N'Manager')
+  (N'KH0532', N'Ramanujan G', N'ramanujan.g@mahle.com', N'Process Engineering', N'CHENNAI', N'Asst. Manager')
 ) AS source (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
 ON target.Emp_No = source.Emp_No
 WHEN MATCHED THEN
@@ -318,6 +315,7 @@ GO
 
 MERGE dbo.Employees AS target
 USING (VALUES
+  (N'KH0535', N'Vaibhav Narendra Goel', N'vaibhav.a.goel@mahle.com', N'After Market', N'Head Office', N'Manager'),
   (N'KH0537', N'Akshay Prabhune', N'akshay.prabhune@mahle.com', N'Finance', N'Head Office', N'Asst. Manager'),
   (N'KH0538', N'P Arun Kumar', N'arunkumar.paramasivam@mahle.com', N'Tooling', N'Head Office', N'Asst. Manager'),
   (N'KH0540', N'Tirath Singh', N'tirath.singh@mahle.com', N'Engineering (R&D)', N'Head Office', N'AGM'),
@@ -348,6 +346,7 @@ USING (VALUES
   (N'KH0581', N'Twinkle Shukla', N'twinkle.shukla@mahle.com', N'HR', N'Head Office', N'Sr. Executive'),
   (N'KH0582', N'Vijay Karde', N'vijay.karde@mahle.com', N'After Market', N'Head Office', N'Asst. Manager'),
   (N'KH0585', N'Kunal Bidla', N'kunal.bidla@mahle.com', N'HR', N'Head Office', N'Assistant Manager'),
+  (N'KH0587', N'Rakesh Vasudev Patil', N'rakesh.patil@mahle.com', N'After Market', N'Head Office', N'Asst. Manager'),
   (N'KH0588', N'Manish  Kumar', N'manish.c.kumar@mahle.com', N'Engineering (R&D)', N'Head Office', N'Sr. Manager'),
   (N'KH0589', N'Manish Kumar Gupta', N'manish.a.gupta@mahle.com', N'PROJECT MANAGEMENT', N'Head Office', N'Manager'),
   (N'KH0590', N'Debi Prasad Tripathy', N'debiprasad.tripathy@mahle.com', N'Central Purchase', N'Head Office', N'Manager'),
@@ -365,9 +364,7 @@ USING (VALUES
   (N'KH0608', N'Abhinav Balwan', N'abhinav.balwan@mahle.com', N'HR', N'Head Office', N'AGM'),
   (N'KH0609', N'Tapash Bera', N'tapash.bera@mahle.com', N'After Market', N'Head Office', N'Asst. Manager'),
   (N'KH0610', N'M Maheshwaran', N'maheshwaran.m@mahle.com', N'OE Marketing', N'Chennai-HO', N'Manager'),
-  (N'KH0612', N'Kamlesh Kumar', N'kamlesh.a.kumar@mahle.com', N'Central Quality', N'Chennai-HO', N'Engineer'),
-  (N'KH0614', N'Sandeep .', N'sandeep.thaledi@mahle.com', N'After Market', N'Head Office', N'Asst. Manager'),
-  (N'KH0615', N'Laitonjam Manisankar Singha', N'manisankar.singha@mahle.com', N'After Market', N'Head Office', N'Sr. Manager')
+  (N'KH0612', N'Kamlesh Kumar', N'kamlesh.a.kumar@mahle.com', N'Central Quality', N'Chennai-HO', N'Engineer')
 ) AS source (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
 ON target.Emp_No = source.Emp_No
 WHEN MATCHED THEN
@@ -379,6 +376,8 @@ GO
 
 MERGE dbo.Employees AS target
 USING (VALUES
+  (N'KH0614', N'Sandeep .', N'sandeep.thaledi@mahle.com', N'After Market', N'Head Office', N'Asst. Manager'),
+  (N'KH0615', N'Laitonjam Manisankar Singha', N'manisankar.singha@mahle.com', N'After Market', N'Head Office', N'Sr. Manager'),
   (N'KH0616', N'Deeksha Rahi', N'diksha.rahi@mahle.com', N'OE Marketing', N'Head Office', N'Asst. Manager'),
   (N'KH0617', N'Vikas Aggarwal', N'vikas.aggarwal@mahle.com', N'Engineering (R&D)', N'Head Office', N'Sr. VP'),
   (N'KH0618', N'Arjun Singh', N'arjun.singh@mahle.com', N'Engineering (R&D)', N'Head Office', N'Sr. Engineer'),
@@ -409,12 +408,12 @@ USING (VALUES
   (N'KH0647', N'Sandeepan Kar', N'sandeepan.kar@mahle.com', N'HR', N'Head Office', N'Senior Manager'),
   (N'KH0648', N'Vijay Tanwani', N'vijay.tanwani@mahle.com', N'Finance', N'Head Office', N'Senior Manager'),
   (N'KH0649', N'YATISH RAJ Y', N'yatish.raj@mahle.com', N'After Market', N'Head Office', N'Assistant Manager'),
-  (N'KH050', N'Rahul Singh Rana', N'rahulsingh.rana@mahle.com', N'Central Quality', N'Head Office', N'Manager'),
+  (N'KH0650', N'Rahul Singh Rana', N'rahulsingh.rana@mahle.com', N'Central Quality', N'Head Office', N'Manager'),
   (N'KH0651', N'AASHISH RAI', N'aashish.rai@mahle.com', N'Quality', N'Head Office', N'GET'),
   (N'KH0652', N'Anway Walke', N'anway.walke@mahle.com', N'Engineering (R&D)', N'Head Office', N'Management Trainee'),
   (N'KH0653', N'HARSHA VARDHAN S', N'harsha.vardhan@mahle.com', N'SCM', N'Head Office', N'GET'),
-  (N'KH0654', N'Yuvan Chophla', NULL, N'Central Process', N'Head Office', N'GET'),
-  (N'KH0655', N'Chebolu Pranay', NULL, N'Process Engineering', N'Head Office', N'GET')
+  (N'KH0654', N'Yuvan Chophla', N'', N'Central Process', N'Head Office', N'GET'),
+  (N'KH0655', N'Chebolu Pranay', N'', N'Process Engineering', N'Head Office', N'GET')
 ) AS source (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
 ON target.Emp_No = source.Emp_No
 WHEN MATCHED THEN
@@ -424,425 +423,30 @@ WHEN NOT MATCHED THEN
   VALUES (source.Emp_No, source.DisplayName, source.Work_Email, source.Department, source.Location, source.Designation);
 GO
 
--- 2. Ensure Default Roles in dbo.EmpRoles
-MERGE dbo.EmpRoles AS target
-USING (VALUES
-  (N'001332', N'employee', 0, 0, 0),
-  (N'001335', N'employee', 0, 0, 0),
-  (N'001336', N'employee', 0, 0, 0),
-  (N'001337', N'employee', 0, 0, 0),
-  (N'001351', N'employee', 0, 0, 0),
-  (N'001656', N'employee', 0, 0, 0),
-  (N'001693', N'employee', 0, 0, 0),
-  (N'001729', N'employee', 0, 0, 0),
-  (N'001754', N'employee', 0, 0, 0),
-  (N'001806', N'employee', 0, 0, 0),
-  (N'001825', N'employee', 0, 0, 0),
-  (N'001828', N'employee', 0, 0, 0),
-  (N'001914', N'employee', 0, 0, 0),
-  (N'001935', N'employee', 0, 0, 0),
-  (N'002028', N'employee', 0, 0, 0),
-  (N'002162', N'employee', 0, 0, 0),
-  (N'002234', N'employee', 0, 0, 0),
-  (N'006505', N'employee', 0, 0, 0),
-  (N'006579', N'employee', 0, 0, 0),
-  (N'006637', N'employee', 0, 0, 0),
-  (N'006642', N'employee', 0, 0, 0),
-  (N'006670', N'employee', 0, 0, 0),
-  (N'006671', N'employee', 0, 0, 0),
-  (N'006673', N'employee', 0, 0, 0),
-  (N'006676', N'employee', 0, 0, 0),
-  (N'006681', N'employee', 0, 0, 0),
-  (N'006682', N'employee', 0, 0, 0),
-  (N'006685', N'employee', 0, 0, 0),
-  (N'006687', N'employee', 0, 0, 0),
-  (N'006688', N'employee', 0, 0, 0),
-  (N'006689', N'employee', 0, 0, 0),
-  (N'006690', N'employee', 0, 0, 0),
-  (N'006691', N'employee', 0, 0, 0),
-  (N'006692', N'employee', 0, 0, 0),
-  (N'006694', N'employee', 0, 0, 0),
-  (N'006696', N'employee', 0, 0, 0),
-  (N'006699', N'employee', 0, 0, 0),
-  (N'006701', N'employee', 0, 0, 0),
-  (N'006703', N'employee', 0, 0, 0),
-  (N'006706', N'employee', 0, 0, 0),
-  (N'006707', N'employee', 0, 0, 0),
-  (N'006708', N'employee', 0, 0, 0),
-  (N'006709', N'employee', 0, 0, 0),
-  (N'006711', N'employee', 0, 0, 0),
-  (N'006712', N'employee', 0, 0, 0),
-  (N'006713', N'employee', 0, 0, 0),
-  (N'1002', N'employee', 0, 0, 0),
-  (N'1009', N'employee', 0, 0, 0),
-  (N'1027', N'employee', 0, 0, 0),
-  (N'1030', N'employee', 0, 0, 0)
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
+-- 2. Seed Default Passwords for new employees
+MERGE dbo.EmpPasswords AS target
+USING (
+  SELECT 
+    e.Emp_No,
+    CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', 
+      UPPER(RIGHT(e.Emp_No, CASE WHEN LEN(e.Emp_No) >= 4 THEN 4 ELSE LEN(e.Emp_No) END)) + 
+      LEFT(REPLACE(e.DisplayName, ' ', ''), 4)
+    ), 2) AS PasswordHash
+  FROM dbo.Employees e
+) AS source
 ON target.Emp_No = source.Emp_No
 WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
+  INSERT (Emp_No, PasswordHash) VALUES (source.Emp_No, source.PasswordHash);
 GO
 
+-- 3. Seed Default Employee Roles
 MERGE dbo.EmpRoles AS target
-USING (VALUES
-  (N'1031', N'employee', 0, 0, 0),
-  (N'1033', N'employee', 0, 0, 0),
-  (N'1048', N'employee', 0, 0, 0),
-  (N'1052', N'employee', 0, 0, 0),
-  (N'1077', N'employee', 0, 0, 0),
-  (N'1078', N'employee', 0, 0, 0),
-  (N'1084', N'employee', 0, 0, 0),
-  (N'1088', N'employee', 0, 0, 0),
-  (N'1089', N'employee', 0, 0, 0),
-  (N'1092', N'employee', 0, 0, 0),
-  (N'1098', N'employee', 0, 0, 0),
-  (N'1099', N'employee', 0, 0, 0),
-  (N'1105', N'employee', 0, 0, 0),
-  (N'1107', N'employee', 0, 0, 0),
-  (N'1108', N'employee', 0, 0, 0),
-  (N'1109', N'employee', 0, 0, 0),
-  (N'1110', N'employee', 0, 0, 0),
-  (N'1112', N'employee', 0, 0, 0),
-  (N'1113', N'employee', 0, 0, 0),
-  (N'1114', N'employee', 0, 0, 0),
-  (N'1116', N'employee', 0, 0, 0),
-  (N'1117', N'employee', 0, 0, 0),
-  (N'1118', N'employee', 0, 0, 0),
-  (N'1119', N'employee', 0, 0, 0),
-  (N'1120', N'employee', 0, 0, 0),
-  (N'1121', N'employee', 0, 0, 0),
-  (N'1122', N'employee', 0, 0, 0),
-  (N'1123', N'employee', 0, 0, 0),
-  (N'6007', N'employee', 0, 0, 0),
-  (N'6009', N'employee', 0, 0, 0),
-  (N'6074', N'employee', 0, 0, 0),
-  (N'6096', N'employee', 0, 0, 0),
-  (N'6126', N'employee', 0, 0, 0),
-  (N'6139', N'employee', 0, 0, 0),
-  (N'6165', N'employee', 0, 0, 0),
-  (N'6187', N'employee', 0, 0, 0),
-  (N'6215', N'employee', 0, 0, 0),
-  (N'8021', N'employee', 0, 0, 0),
-  (N'8409', N'employee', 0, 0, 0),
-  (N'8411', N'employee', 0, 0, 0),
-  (N'8412', N'employee', 0, 0, 0),
-  (N'8413', N'employee', 0, 0, 0),
-  (N'E20067', N'employee', 0, 0, 0),
-  (N'E20070', N'employee', 0, 0, 0),
-  (N'E20089', N'employee', 0, 0, 0),
-  (N'E20196', N'employee', 0, 0, 0),
-  (N'E40002', N'employee', 0, 0, 0),
-  (N'E40007', N'employee', 0, 0, 0),
-  (N'E40022', N'employee', 0, 0, 0),
-  (N'E40032', N'employee', 0, 0, 0)
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
+USING (
+  SELECT e.Emp_No FROM dbo.Employees e
+) AS source
 ON target.Emp_No = source.Emp_No
 WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
+  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, 'employee', 0, 0, 0);
 GO
-
-MERGE dbo.EmpRoles AS target
-USING (VALUES
-  (N'E40041', N'employee', 0, 0, 0),
-  (N'E40053', N'employee', 0, 0, 0),
-  (N'E40055', N'employee', 0, 0, 0),
-  (N'E40065', N'employee', 0, 0, 0),
-  (N'E40069', N'employee', 0, 0, 0),
-  (N'E40073', N'employee', 0, 0, 0),
-  (N'E40074', N'employee', 0, 0, 0),
-  (N'E40075', N'employee', 0, 0, 0),
-  (N'E40082', N'employee', 0, 0, 0),
-  (N'E40090', N'employee', 0, 0, 0),
-  (N'E40093', N'employee', 0, 0, 0),
-  (N'E40100', N'employee', 0, 0, 0),
-  (N'E40101', N'employee', 0, 0, 0),
-  (N'E40103', N'employee', 0, 0, 0),
-  (N'E40209', N'employee', 0, 0, 0),
-  (N'E40292', N'employee', 0, 0, 0),
-  (N'E40297', N'employee', 0, 0, 0),
-  (N'E40370', N'employee', 0, 0, 0),
-  (N'E50002', N'employee', 0, 0, 0),
-  (N'E50003', N'employee', 0, 0, 0),
-  (N'E50013', N'employee', 0, 0, 0),
-  (N'E50037', N'employee', 0, 0, 0),
-  (N'E50039', N'employee', 0, 0, 0),
-  (N'E50045', N'employee', 0, 0, 0),
-  (N'E50108', N'employee', 0, 0, 0),
-  (N'E50135', N'employee', 0, 0, 0),
-  (N'E50162', N'employee', 0, 0, 0),
-  (N'E50203', N'employee', 0, 0, 0),
-  (N'E50278', N'employee', 0, 0, 0),
-  (N'E50322', N'employee', 0, 0, 0),
-  (N'E50332', N'employee', 0, 0, 0),
-  (N'E50396', N'employee', 0, 0, 0),
-  (N'E50432', N'employee', 0, 0, 0),
-  (N'E50433', N'employee', 0, 0, 0),
-  (N'E50438', N'employee', 0, 0, 0),
-  (N'K0060', N'employee', 0, 0, 0),
-  (N'K0075', N'employee', 0, 0, 0),
-  (N'K0099', N'employee', 0, 0, 0),
-  (N'K01003', N'employee', 0, 0, 0),
-  (N'K01013', N'employee', 0, 0, 0),
-  (N'K01028', N'employee', 0, 0, 0),
-  (N'K01030', N'employee', 0, 0, 0),
-  (N'K01069', N'employee', 0, 0, 0),
-  (N'K01104', N'employee', 0, 0, 0),
-  (N'K01140', N'employee', 0, 0, 0),
-  (N'K01144', N'employee', 0, 0, 0),
-  (N'K01146', N'employee', 0, 0, 0),
-  (N'K01149', N'employee', 0, 0, 0),
-  (N'K01151', N'employee', 0, 0, 0),
-  (N'K01152', N'employee', 0, 0, 0)
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
-ON target.Emp_No = source.Emp_No
-WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
+PRINT 'Bulk employee seed completed successfully! Total records: 338';
 GO
-
-MERGE dbo.EmpRoles AS target
-USING (VALUES
-  (N'K01153', N'employee', 0, 0, 0),
-  (N'K01154', N'employee', 0, 0, 0),
-  (N'K01162', N'employee', 0, 0, 0),
-  (N'K01163', N'employee', 0, 0, 0),
-  (N'K01164', N'employee', 0, 0, 0),
-  (N'K01166', N'employee', 0, 0, 0),
-  (N'K01167', N'employee', 0, 0, 0),
-  (N'K01168', N'employee', 0, 0, 0),
-  (N'K01169', N'employee', 0, 0, 0),
-  (N'K01170', N'employee', 0, 0, 0),
-  (N'K01171', N'employee', 0, 0, 0),
-  (N'K01172', N'employee', 0, 0, 0),
-  (N'K0350', N'employee', 0, 0, 0),
-  (N'K0378', N'employee', 0, 0, 0),
-  (N'K0407', N'employee', 0, 0, 0),
-  (N'K0433', N'employee', 0, 0, 0),
-  (N'K0462', N'employee', 0, 0, 0),
-  (N'K0569', N'employee', 0, 0, 0),
-  (N'K0577', N'employee', 0, 0, 0),
-  (N'K0592', N'employee', 0, 0, 0),
-  (N'K0610', N'employee', 0, 0, 0),
-  (N'K0676', N'employee', 0, 0, 0),
-  (N'K0692', N'employee', 0, 0, 0),
-  (N'K0693', N'employee', 0, 0, 0),
-  (N'K0713', N'employee', 0, 0, 0),
-  (N'K0723', N'employee', 0, 0, 0),
-  (N'K0729', N'employee', 0, 0, 0),
-  (N'K0742', N'employee', 0, 0, 0),
-  (N'K0750', N'employee', 0, 0, 0),
-  (N'K0771', N'employee', 0, 0, 0),
-  (N'K0773', N'employee', 0, 0, 0),
-  (N'K0777', N'employee', 0, 0, 0),
-  (N'K0800', N'employee', 0, 0, 0),
-  (N'K0822', N'employee', 0, 0, 0),
-  (N'K0826', N'employee', 0, 0, 0),
-  (N'K0827', N'employee', 0, 0, 0),
-  (N'K0845', N'employee', 0, 0, 0),
-  (N'K0854', N'employee', 0, 0, 0),
-  (N'K0856', N'employee', 0, 0, 0),
-  (N'K0867', N'employee', 0, 0, 0),
-  (N'K0871', N'employee', 0, 0, 0),
-  (N'K0915', N'employee', 0, 0, 0),
-  (N'K0920', N'employee', 0, 0, 0),
-  (N'K0927', N'employee', 0, 0, 0),
-  (N'K0988', N'employee', 0, 0, 0),
-  (N'KA1092', N'employee', 0, 0, 0),
-  (N'KA1112', N'employee', 0, 0, 0),
-  (N'KA1151', N'employee', 0, 0, 0),
-  (N'KA1235', N'employee', 0, 0, 0),
-  (N'KH0083', N'employee', 0, 0, 0)
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
-ON target.Emp_No = source.Emp_No
-WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
-GO
-
-MERGE dbo.EmpRoles AS target
-USING (VALUES
-  (N'KH0109', N'employee', 0, 0, 0),
-  (N'KH0130', N'employee', 0, 0, 0),
-  (N'KH0142', N'employee', 0, 0, 0),
-  (N'KH0155', N'employee', 0, 0, 0),
-  (N'KH0183', N'employee', 0, 0, 0),
-  (N'KH0194', N'employee', 0, 0, 0),
-  (N'KH0215', N'employee', 0, 0, 0),
-  (N'KH0232', N'employee', 0, 0, 0),
-  (N'KH0254', N'employee', 0, 0, 0),
-  (N'KH0265', N'employee', 0, 0, 0),
-  (N'KH0286', N'employee', 0, 0, 0),
-  (N'KH0287', N'employee', 0, 0, 0),
-  (N'KH0289', N'employee', 0, 0, 0),
-  (N'KH0308', N'employee', 0, 0, 0),
-  (N'KH0311', N'employee', 0, 0, 0),
-  (N'KH0330', N'employee', 0, 0, 0),
-  (N'KH0364', N'employee', 0, 0, 0),
-  (N'KH0370', N'employee', 0, 0, 0),
-  (N'KH0389', N'employee', 0, 0, 0),
-  (N'KH0396', N'employee', 0, 0, 0),
-  (N'KH0398', N'employee', 0, 0, 0),
-  (N'KH0399', N'employee', 0, 0, 0),
-  (N'KH0415', N'employee', 0, 0, 0),
-  (N'KH0420', N'employee', 0, 0, 0),
-  (N'KH0438', N'employee', 0, 0, 0),
-  (N'KH0449', N'employee', 0, 0, 0),
-  (N'KH0453', N'employee', 0, 0, 0),
-  (N'KH0454', N'employee', 0, 0, 0),
-  (N'KH0457', N'employee', 0, 0, 0),
-  (N'KH0458', N'employee', 0, 0, 0),
-  (N'KH0460', N'employee', 0, 0, 0),
-  (N'KH0470', N'employee', 0, 0, 0),
-  (N'KH0475', N'employee', 0, 0, 0),
-  (N'KH0481', N'employee', 0, 0, 0),
-  (N'KH0483', N'employee', 0, 0, 0),
-  (N'KH0485', N'employee', 0, 0, 0),
-  (N'KH0495', N'employee', 0, 0, 0),
-  (N'KH0500', N'employee', 0, 0, 0),
-  (N'KH0501', N'employee', 0, 0, 0),
-  (N'KH0503', N'employee', 0, 0, 0),
-  (N'KH0504', N'employee', 0, 0, 0),
-  (N'KH0510', N'employee', 0, 0, 0),
-  (N'KH0512', N'employee', 0, 0, 0),
-  (N'KH0516', N'employee', 0, 0, 0),
-  (N'KH0522', N'employee', 0, 0, 0),
-  (N'KH0527', N'employee', 0, 0, 0),
-  (N'KH0529', N'employee', 0, 0, 0),
-  (N'KH0531', N'employee', 0, 0, 0),
-  (N'KH0532', N'employee', 0, 0, 0),
-  (N'KH0535', N'employee', 0, 0, 0)
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
-ON target.Emp_No = source.Emp_No
-WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
-GO
-
-MERGE dbo.EmpRoles AS target
-USING (VALUES
-  (N'KH0537', N'employee', 0, 0, 0),
-  (N'KH0538', N'employee', 0, 0, 0),
-  (N'KH0540', N'employee', 0, 0, 0),
-  (N'KH0542', N'employee', 0, 0, 0),
-  (N'KH0544', N'employee', 0, 0, 0),
-  (N'KH0545', N'employee', 0, 0, 0),
-  (N'KH0548', N'employee', 0, 0, 0),
-  (N'KH0551', N'employee', 0, 0, 0),
-  (N'KH0552', N'employee', 0, 0, 0),
-  (N'KH0553', N'employee', 0, 0, 0),
-  (N'KH0554', N'employee', 0, 0, 0),
-  (N'KH0555', N'employee', 0, 0, 0),
-  (N'KH0556', N'employee', 0, 0, 0),
-  (N'KH0561', N'employee', 0, 0, 0),
-  (N'KH0562', N'employee', 0, 0, 0),
-  (N'KH0563', N'employee', 0, 0, 0),
-  (N'KH0564', N'employee', 0, 0, 0),
-  (N'KH0565', N'employee', 0, 0, 0),
-  (N'KH0566', N'employee', 0, 0, 0),
-  (N'KH0567', N'employee', 0, 0, 0),
-  (N'KH0570', N'employee', 0, 0, 0),
-  (N'KH0572', N'employee', 0, 0, 0),
-  (N'KH0574', N'employee', 0, 0, 0),
-  (N'KH0575', N'employee', 0, 0, 0),
-  (N'KH0576', N'employee', 0, 0, 0),
-  (N'KH0578', N'employee', 0, 0, 0),
-  (N'KH0579', N'employee', 0, 0, 0),
-  (N'KH0581', N'employee', 0, 0, 0),
-  (N'KH0582', N'employee', 0, 0, 0),
-  (N'KH0585', N'employee', 0, 0, 0),
-  (N'KH0588', N'employee', 0, 0, 0),
-  (N'KH0589', N'employee', 0, 0, 0),
-  (N'KH0590', N'employee', 0, 0, 0),
-  (N'KH0593', N'employee', 0, 0, 0),
-  (N'KH0595', N'employee', 0, 0, 0),
-  (N'KH0596', N'employee', 0, 0, 0),
-  (N'KH0597', N'employee', 0, 0, 0),
-  (N'KH0598', N'employee', 0, 0, 0),
-  (N'KH0599', N'employee', 0, 0, 0),
-  (N'KH0600', N'employee', 0, 0, 0),
-  (N'KH0602', N'employee', 0, 0, 0),
-  (N'KH0603', N'employee', 0, 0, 0),
-  (N'KH0606', N'employee', 0, 0, 0),
-  (N'KH0607', N'employee', 0, 0, 0),
-  (N'KH0608', N'employee', 0, 0, 0),
-  (N'KH0609', N'employee', 0, 0, 0),
-  (N'KH0610', N'employee', 0, 0, 0),
-  (N'KH0612', N'employee', 0, 0, 0),
-  (N'KH0614', N'employee', 0, 0, 0),
-  (N'KH0615', N'employee', 0, 0, 0)
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
-ON target.Emp_No = source.Emp_No
-WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
-GO
-
-MERGE dbo.EmpRoles AS target
-USING (VALUES
-  (N'KH0616', N'employee', 0, 0, 0),
-  (N'KH0617', N'employee', 0, 0, 0),
-  (N'KH0618', N'employee', 0, 0, 0),
-  (N'KH0619', N'employee', 0, 0, 0),
-  (N'KH0620', N'employee', 0, 0, 0),
-  (N'KH0621', N'employee', 0, 0, 0),
-  (N'KH0623', N'employee', 0, 0, 0),
-  (N'KH0624', N'employee', 0, 0, 0),
-  (N'KH0625', N'employee', 0, 0, 0),
-  (N'KH0627', N'employee', 0, 0, 0),
-  (N'KH0628', N'employee', 0, 0, 0),
-  (N'KH0630', N'employee', 0, 0, 0),
-  (N'KH0631', N'employee', 0, 0, 0),
-  (N'KH0632', N'employee', 0, 0, 0),
-  (N'KH0633', N'employee', 0, 0, 0),
-  (N'KH0634', N'employee', 0, 0, 0),
-  (N'KH0635', N'employee', 0, 0, 0),
-  (N'KH0637', N'employee', 0, 0, 0),
-  (N'KH0638', N'employee', 0, 0, 0),
-  (N'KH0639', N'employee', 0, 0, 0),
-  (N'KH0640', N'employee', 0, 0, 0),
-  (N'KH0641', N'employee', 0, 0, 0),
-  (N'KH0642', N'employee', 0, 0, 0),
-  (N'KH0643', N'employee', 0, 0, 0),
-  (N'KH0644', N'employee', 0, 0, 0),
-  (N'KH0645', N'employee', 0, 0, 0),
-  (N'KH0646', N'employee', 0, 0, 0),
-  (N'KH0647', N'employee', 0, 0, 0),
-  (N'KH0648', N'employee', 0, 0, 0),
-  (N'KH0649', N'employee', 0, 0, 0),
-  (N'KH050', N'employee', 0, 0, 0),
-  (N'KH0651', N'employee', 0, 0, 0),
-  (N'KH0652', N'employee', 0, 0, 0),
-  (N'KH0653', N'employee', 0, 0, 0),
-  (N'KH0654', N'employee', 0, 0, 0),
-  (N'KH0655', N'employee', 0, 0, 0)
-) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
-ON target.Emp_No = source.Emp_No
-WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
-GO
-
-PRINT 'Bulk employee seed completed successfully! Total records: 336';
-GO
-
-
---ADMIN ACCESS
-
-USE [Rewards];
-GO
-
-MERGE dbo.EmpRoles AS target
-USING (VALUES (N'KH0585', N'admin', 0, 0, 1)) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
-ON target.Emp_No = source.Emp_No
-WHEN MATCHED THEN
-  UPDATE SET IsAdmin = 1, Role = N'admin', UpdatedAt = GETDATE()
-WHEN NOT MATCHED THEN
-  INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin)
-  VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin);
-GO
-
-
--- 1. Delete dependent child tables & employees (ON DELETE CASCADE will also clean child tables)
-DELETE FROM dbo.EmpPasswords;
-DELETE FROM dbo.EmpRoles;
-DELETE FROM dbo.Employees;
-
--- 2. Delete app state & configuration data
-DELETE FROM dbo.Cycles;
-DELETE FROM dbo.Points;
-DELETE FROM dbo.Branding;
