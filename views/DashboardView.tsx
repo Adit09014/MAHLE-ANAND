@@ -258,10 +258,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <Sparkles size={13} className="text-sky-300" />
                 <span>
                   {isAdmin
-                    ? "MAHLE ANAND Admin Executive Dashboard"
+                    ? "MAHLE ANAND Filter System Admin Executive Dashboard"
                     : isHod
                       ? `HOD Dashboard — ${hodUnitObj?.name || hodUnitId}`
-                      : "MAHLE ANAND Personal Dashboard"}
+                      : "MAHLE ANAND Filter System Personal Dashboard"}
                 </span>
               </div>
 
@@ -282,7 +282,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 ? "Executive overview of total nominations, department quota completions, panel judge assignments, and department leadership rankings."
                 : isHod
                   ? `Manage employee nominations, review department entries, and track recognition awards won by ${hodUnitObj?.name || "your department"}.`
-                  : "Track your applied nominations, cumulative reward points, and official award titles across MAHLE ANAND."}
+                  : "Track your applied nominations, cumulative reward points, and official award titles across MAHLE ANAND Filter System."}
             </p>
           </div>
 
@@ -722,9 +722,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <strong className="block text-xs font-bold text-blue-950">
                         {st.unit.name}
                       </strong>
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase">
-                        {st.unit.kind}
-                      </span>
                     </div>
                     <span className="rounded-full bg-blue-900/10 px-2.5 py-0.5 text-xs font-bold text-blue-900">
                       {st.appliedCount} {st.appliedCount === 1 ? "Nominee" : "Nominees"}
@@ -793,9 +790,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <strong className="block text-sm font-extrabold text-blue-950">
                           {dept.unit.name}
                         </strong>
-                        <span className="text-[10px] text-slate-500 font-semibold uppercase">
-                          {dept.unit.kind}
-                        </span>
                       </div>
                     </div>
                     <div className="text-right">

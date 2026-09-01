@@ -26,7 +26,7 @@ import {
   Bell,
   Settings,
 } from "lucide-react";
-import { UNITS, STAGES, PRIZE, POINTS } from "../lib/constants";
+import { UNITS, STAGES, POINTS } from "../lib/constants";
 import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
 import { loadCycle, saveCycle, loadBranding, loadPoints } from "../lib/storage";
 import { getAuthSession, logoutUser } from "../lib/auth";
@@ -136,13 +136,18 @@ export default function RRAdmin() {
   // Filter permitted tabs based on user role & isPanelJudge DB boolean (RBAC)
   const isPanelJudge = Boolean(currentUser?.isPanelJudge);
   const isHrOrAdmin = currentUser?.role === "hr" || currentUser?.role === "admin" || Boolean(currentUser?.isAdmin);
+  const isHOD = Boolean(currentUser?.isHOD) || currentUser?.role === "hod";
 
   const allowedRoles: TabId[] = currentUser
     ? isHrOrAdmin
-      ? isPanelJudge
-        ? ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
-        : ["dashboard", "employee", "hod", "results", "hr", "settings"]
-      : currentUser.role === "hod"
+      ? isHOD
+        ? isPanelJudge
+          ? ["dashboard", "hod", "judge", "results", "hr", "settings"]
+          : ["dashboard", "hod", "results", "hr", "settings"]
+        : isPanelJudge
+          ? ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
+          : ["dashboard", "employee", "hod", "results", "hr", "settings"]
+      : isHOD
         ? isPanelJudge
           ? ["dashboard", "hod", "judge", "results", "settings"]
           : ["dashboard", "hod", "results", "settings"]
@@ -166,7 +171,7 @@ export default function RRAdmin() {
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <BrandMark url={brand.logoUrl} className="h-7 max-w-[110px]" />
-          <span className="font-bold text-sm tracking-tight text-white">MAHLE ANAND</span>
+          <span className="font-bold text-sm tracking-tight text-white">MAHLE ANAND Filter System</span>
         </div>
         {currentUser && (
           <span className="text-xs font-semibold bg-white/10 px-2.5 py-1 rounded-full text-sky-200">
@@ -196,7 +201,7 @@ export default function RRAdmin() {
             <BrandMark url={brand.logoUrl} className="h-9 max-w-full w-auto" />
             <div>
               <h1 className="text-sm font-extrabold tracking-tight text-blue-950 leading-tight">
-                MAHLE ANAND
+                MAHLE ANAND Filter System
               </h1>
               <p className="text-[11px] font-medium text-slate-400">
                 Corporate Rewards
@@ -454,7 +459,7 @@ export default function RRAdmin() {
                     Instructions &amp; Policy Guidelines
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    MAHLE ANAND Recognition Process, Scoring Formula &amp; LSIP Rules
+                    MAHLE ANAND Filter System Recognition Process, Scoring Formula &amp; LSIP Rules
                   </p>
                 </div>
               </div>
@@ -510,7 +515,7 @@ export default function RRAdmin() {
                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">15th of Month</span>
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Highest average panel score nominee wins category title &amp; receives <strong>Rs 2,000 cash prize</strong>.
+                      Highest average panel score nominee wins category title for the month.
                     </p>
                   </div>
                 </div>
@@ -556,7 +561,7 @@ export default function RRAdmin() {
             {/* Footer */}
             <div className="pt-2 flex items-center justify-between border-t border-slate-100">
               <span className="text-[11px] font-semibold text-slate-400">
-                MAHLE ANAND Recognition Policy Guidelines
+                MAHLE ANAND Filter System Recognition Policy Guidelines
               </span>
               <button
                 onClick={() => setShowHelpModal(false)}

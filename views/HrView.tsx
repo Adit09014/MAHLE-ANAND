@@ -25,7 +25,7 @@ import {
   Sliders,
   Image as ImageIcon,
 } from "lucide-react";
-import { STAGES, PANEL_SIZE, POINTS, UNITS, catById, unitById } from "../lib/constants";
+import { STAGES, PANEL_SIZE, POINTS, UNITS, catById, unitById, getDynamicUnits } from "../lib/constants";
 import {
   results,
   endorsedList,
@@ -73,6 +73,7 @@ export interface EmployeeRecord {
   gender?: string;
   designation?: string;
   email?: string;
+  location?: string;
 }
 
 export interface HrViewProps {
@@ -108,6 +109,8 @@ export const HrView: React.FC<HrViewProps> = ({
   // Edit Employee Modal States
   const [editingEmp, setEditingEmp] = useState<EmployeeRecord | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editLocation, setEditLocation] = useState("");
   const [editUnitId, setEditUnitId] = useState("p1");
   const [editRole, setEditRole] = useState<"employee" | "hod" | "hr" | "admin">("employee");
   const [editIsPanelJudge, setEditIsPanelJudge] = useState(false);
@@ -123,6 +126,8 @@ export const HrView: React.FC<HrViewProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [addCode, setAddCode] = useState("");
   const [addName, setAddName] = useState("");
+  const [addEmail, setAddEmail] = useState("");
+  const [addLocation, setAddLocation] = useState("");
   const [addUnitId, setAddUnitId] = useState("p1");
   const [addRole, setAddRole] = useState<"employee" | "hod" | "hr" | "admin">("employee");
   const [addIsPanelJudge, setAddIsPanelJudge] = useState(false);
@@ -163,7 +168,6 @@ export const HrView: React.FC<HrViewProps> = ({
         body: JSON.stringify({
           code: assignHodEmpCode,
           unitId: assignHodUnitId,
-          role: "hod",
           isHOD: true,
           adminPassword: assignHodPassword.trim(),
         }),
@@ -307,6 +311,8 @@ export const HrView: React.FC<HrViewProps> = ({
   const openEditModal = (emp: EmployeeRecord) => {
     setEditingEmp(emp);
     setEditName(emp.name);
+    setEditEmail(emp.email || "");
+    setEditLocation(emp.location || "");
     setEditUnitId(emp.unitId);
     setEditRole((emp.role as "employee" | "hod" | "hr" | "admin") || "employee");
     setEditIsPanelJudge(Boolean(emp.isPanelJudge));
@@ -349,6 +355,8 @@ export const HrView: React.FC<HrViewProps> = ({
         body: JSON.stringify({
           code: editingEmp.code,
           name: editName,
+          email: editEmail.trim(),
+          location: editLocation.trim(),
           unitId: editUnitId,
           role: editIsAdmin ? "admin" : editRole,
           isHOD: editIsHOD,
@@ -395,6 +403,8 @@ export const HrView: React.FC<HrViewProps> = ({
         body: JSON.stringify({
           code: addCode.trim().toUpperCase(),
           name: addName.trim(),
+          email: addEmail.trim(),
+          location: addLocation.trim(),
           unitId: addUnitId,
           role: addIsAdmin ? "admin" : addRole,
           isPanelJudge: addIsPanelJudge,
@@ -413,6 +423,8 @@ export const HrView: React.FC<HrViewProps> = ({
         fetchEmployees();
         setAddCode("");
         setAddName("");
+        setAddEmail("");
+        setAddLocation("");
         setTimeout(() => {
           setShowAddModal(false);
           setAddMsg(null);
@@ -487,6 +499,8 @@ export const HrView: React.FC<HrViewProps> = ({
       return matchesSearch && matchesRole && matchesUnit;
     });
   }, [allEmployees, empSearch, empRoleFilter, empUnitFilter]);
+
+  const allUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
 
   useEffect(() => {
     async function fetchHods() {
@@ -775,7 +789,7 @@ export const HrView: React.FC<HrViewProps> = ({
           <div className="space-y-2.5 max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
               <Sparkles size={13} className="text-sky-300" />
-              <span>MAHLE ANAND HR Admin Console</span>
+              <span>MAHLE ANAND Filter System HR Admin Console</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
               HR Recognition Management &amp; System Controls
@@ -1061,7 +1075,7 @@ export const HrView: React.FC<HrViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-blue-900/10 bg-white">
-              {UNITS.map((unit) => {
+              {allUnits.map((unit) => {
                 const currentHod = allEmployees.find(
                   (e) => e.unitId === unit.id && (e.isHOD || e.role === "hod")
                 );
@@ -1069,12 +1083,7 @@ export const HrView: React.FC<HrViewProps> = ({
                 return (
                   <tr key={unit.id} className="hover:bg-blue-50/40 transition">
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-blue-950">{unit.name}</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
-                          {unit.kind}
-                        </span>
-                      </div>
+                      <span className="font-bold text-blue-950">{unit.name}</span>
                     </td>
                     <td className="px-4 py-3 font-medium text-blue-950">
                       {currentHod ? (
@@ -1389,7 +1398,7 @@ export const HrView: React.FC<HrViewProps> = ({
               className="w-full rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs font-medium text-blue-950 outline-none shadow-xs"
             >
               <option value="all">All Departments/Units</option>
-              {UNITS.map((u) => (
+              {allUnits.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
                 </option>
@@ -1600,9 +1609,32 @@ export const HrView: React.FC<HrViewProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label>Work Email</Label>
+                  <input
+                    type="email"
+                    placeholder="e.g. john.doe@mahle.com"
+                    value={addEmail}
+                    onChange={(e) => setAddEmail(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <Label>Location / Plant</Label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Khandsa / Gurgaon"
+                    value={addLocation}
+                    onChange={(e) => setAddLocation(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <Label>Department / Unit</Label>
                   <select value={addUnitId} onChange={(e) => setAddUnitId(e.target.value)} className={inputCls}>
-                    {UNITS.map((u) => (
+                    {allUnits.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name}
                       </option>
@@ -1622,6 +1654,20 @@ export const HrView: React.FC<HrViewProps> = ({
                     <option value="admin">System Admin</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <Label>Gender</Label>
+                <select
+                  value={addGender}
+                  onChange={(e) => setAddGender(e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">-- Not Specified (NULL) --</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
 
               <div className="flex flex-col gap-2 pt-2">
@@ -1719,7 +1765,7 @@ export const HrView: React.FC<HrViewProps> = ({
                 <div>
                   <Label>Department / Unit</Label>
                   <select value={editUnitId} onChange={(e) => setEditUnitId(e.target.value)} className={inputCls}>
-                    {UNITS.map((u) => (
+                    {allUnits.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name}
                       </option>
@@ -1730,10 +1776,44 @@ export const HrView: React.FC<HrViewProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label>Work Email</Label>
+                  <input
+                    type="email"
+                    placeholder="Work Email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <Label>Location / Plant</Label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Khandsa / Gurgaon"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <Label>System Role</Label>
                   <select
-                    value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as "employee" | "hod" | "hr" | "admin")}
+                    value={editIsAdmin ? "admin" : editRole}
+                    onChange={(e) => {
+                      const val = e.target.value as "employee" | "hod" | "hr" | "admin";
+                      setEditRole(val);
+                      if (val === "admin") {
+                        setEditIsAdmin(true);
+                      } else {
+                        setEditIsAdmin(false);
+                      }
+                      if (val === "hod") {
+                        setEditIsHOD(true);
+                      }
+                    }}
                     className={inputCls}
                   >
                     <option value="employee">Employee</option>
@@ -1743,7 +1823,22 @@ export const HrView: React.FC<HrViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <Label>Change Password</Label>
+                  <Label>Gender</Label>
+                  <select
+                    value={editGender}
+                    onChange={(e) => setEditGender(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">-- Not Specified (NULL) --</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <Label>Change Password</Label>
                   <input
                     type="password"
                     placeholder={editResetDefault ? "Will reset to default password" : "New password (optional)"}
@@ -1768,7 +1863,6 @@ export const HrView: React.FC<HrViewProps> = ({
                     </label>
                   </div>
                 </div>
-              </div>
 
               {/* IsHOD & Panel Judge & Admin Toggles */}
               <div className="rounded-xl border border-blue-900/10 bg-blue-900/3 p-3 space-y-2">
@@ -1792,7 +1886,15 @@ export const HrView: React.FC<HrViewProps> = ({
                     type="checkbox"
                     id="editIsAdmin"
                     checked={editIsAdmin}
-                    onChange={(e) => setEditIsAdmin(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditIsAdmin(checked);
+                      if (checked) {
+                        setEditRole("admin");
+                      } else if (editRole === "admin") {
+                        setEditRole("employee");
+                      }
+                    }}
                     className="h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-600"
                   />
                   <label htmlFor="editIsAdmin" className="text-xs font-semibold text-blue-950">
@@ -2039,10 +2141,7 @@ export const HrView: React.FC<HrViewProps> = ({
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-blue-900/20 space-y-5 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-blue-900/10 pb-4">
               <div>
-                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-blue-900">
-                  {unitById(assignHodUnitId)?.kind || "Department"}
-                </span>
-                <h3 className="text-lg font-extrabold text-blue-950 mt-1">
+                <h3 className="text-lg font-extrabold text-blue-950">
                   Assign Head of Department — {unitById(assignHodUnitId)?.name || assignHodUnitId}
                 </h3>
               </div>

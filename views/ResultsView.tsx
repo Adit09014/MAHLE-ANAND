@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Trophy, Award, Lock, Sparkles, CheckCircle2 } from "lucide-react";
-import { catById, unitById, PRIZE, POINTS } from "../lib/constants";
+import { catById, unitById, POINTS } from "../lib/constants";
 import { results } from "../lib/helpers";
 import { Cycle } from "../lib/types";
 import Card from "../components/Card";
@@ -115,15 +115,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ cycle }) => {
                       <p className="rounded bg-blue-900/5 p-3 text-xs leading-relaxed text-blue-900/80 italic">
                         &ldquo;{winner.nom.citation}&rdquo;
                       </p>
-
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-blue-950 pt-1">
-                        <span className="text-amber-700 font-bold">
-                          Prize: Rs {PRIZE.toLocaleString("en-IN")} Cash Prize + {winner.avg !== null ? (Math.round(winner.avg * 10) / 10).toFixed(1) : "0"} Panel Score to LSIP
-                        </span>
-                        <span className="text-blue-900/40 text-[11px]">
-                          LSIP Weightage Included
-                        </span>
-                      </div>
                     </div>
                   ) : (
                     <div className="py-6 text-center text-xs text-blue-900/50">

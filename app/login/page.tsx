@@ -88,11 +88,17 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-12 bg-slate-50 font-sans text-slate-900 overflow-hidden">
-      {/* Left Column: Dark Blue Hero Section */}
-      <div className="lg:col-span-6 xl:col-span-5 bg-gradient-to-br from-[#061C33] via-[#0A2540] to-[#0D3156] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden min-h-[420px] lg:min-h-screen">
+      {/* Left Column: Dark Blue Hero Section with Car Background Image */}
+      <div 
+        className="lg:col-span-6 xl:col-span-5 text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative overflow-hidden min-h-[420px] lg:min-h-screen bg-cover bg-center"
+        style={{ backgroundImage: "url('/car-bg.png')" }}
+      >
+        {/* Dark Gradient Overlay for optimal contrast and readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#061C33]/85 via-[#0A2540]/80 to-[#0D3156]/90 backdrop-blur-[1px] pointer-events-none" />
+
         {/* Subtle Background Glows */}
-        <div className="absolute right-0 top-0 -mt-16 -mr-16 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute left-0 bottom-0 -mb-16 -ml-16 h-80 w-80 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
+        <div className="absolute right-0 top-0 -mt-16 -mr-16 h-80 w-80 rounded-full bg-sky-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute left-0 bottom-0 -mb-16 -ml-16 h-80 w-80 rounded-full bg-blue-600/15 blur-3xl pointer-events-none" />
 
         {/* Top Header: Current Logo Container */}
         <div className="relative z-10">
@@ -100,24 +106,52 @@ export default function LoginPage() {
         </div>
 
         {/* Center Content: Main Heading & Description */}
-        <div className="relative z-10 space-y-4 my-auto py-8">
+        <div className="relative z-10 space-y-3 my-auto py-6">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white">
             Empowering<br />Excellence.
           </h1>
-          <p className="text-sm sm:text-base text-sky-100/80 leading-relaxed max-w-md font-normal">
-            Welcome to the MAHLE ANAND Rewards Portal. Recognize achievements, celebrate milestones, and build a culture of appreciation.
+          <p className="text-xs sm:text-sm text-sky-100/90 leading-relaxed max-w-md font-normal">
+            Welcome to the MAHLE ANAND Filter System Rewards Portal. Recognize achievements, celebrate milestones, and build a culture of appreciation.
           </p>
         </div>
 
-        {/* Bottom Glassmorphic Card: Culture of Recognition */}
-        <div className="relative z-10 mt-6 p-4 sm:p-5 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-2xl space-y-2 max-w-md">
-          <div className="flex items-center gap-2.5 text-sky-300 font-bold text-xs sm:text-sm">
-            <Award size={18} className="text-sky-300 shrink-0" />
+        {/* Bottom Section: Culture of Recognition 4 Stat Cards */}
+        <div className="relative z-10 mt-4 space-y-3">
+          <div className="flex items-center gap-2 text-sky-300 font-bold text-xs uppercase tracking-wider">
+            <Award size={16} className="text-sky-300 shrink-0" />
             <span>Culture of Recognition</span>
           </div>
-          <p className="text-xs text-white/80 leading-relaxed font-normal">
-            Over 5,000 employees recognized globally this year for outstanding engineering innovation.
-          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Card 1 */}
+            <div className="relative overflow-hidden rounded-xl border border-white/20 bg-white/10 p-3.5 backdrop-blur-md space-y-1 flex flex-col justify-between">
+              <span className="text-2xl sm:text-3xl font-light tracking-tight text-white">71<span className="text-base font-normal">st</span></span>
+              <p className="text-[11px] text-white/90 leading-tight font-medium">Rank in Great Place to Work®</p>
+              <div className="absolute right-1 top-2 bottom-2 w-1 rounded-full bg-sky-400" />
+            </div>
+
+            {/* Card 2 */}
+            <div className="relative overflow-hidden rounded-xl border border-white/20 bg-white/10 p-3.5 backdrop-blur-md space-y-1 flex flex-col justify-between">
+              <span className="text-2xl sm:text-3xl font-light tracking-tight text-white">20</span>
+              <p className="text-[11px] text-white/90 leading-tight font-medium">Patents filed in India</p>
+              <div className="absolute right-1 top-2 bottom-2 w-1 rounded-full bg-sky-400" />
+            </div>
+
+            {/* Card 3 */}
+            <div className="relative overflow-hidden rounded-xl border border-white/20 bg-white/10 p-3.5 backdrop-blur-md space-y-1 flex flex-col justify-between col-span-2 sm:col-span-1">
+              <p className="text-[11px] text-white/90 leading-snug font-medium pt-1">
+                Has a unique filter paper impregnation facility and also provides eco-friendly fuel filters
+              </p>
+              <div className="absolute right-1 top-2 bottom-2 w-1 rounded-full bg-sky-400" />
+            </div>
+
+            {/* Card 4 */}
+            <div className="relative overflow-hidden rounded-xl border border-white/20 bg-white/10 p-3.5 backdrop-blur-md space-y-1 flex flex-col justify-between">
+              <span className="text-2xl sm:text-3xl font-light tracking-tight text-white">1600+</span>
+              <p className="text-[11px] text-white/90 leading-tight font-medium">Employees</p>
+              <div className="absolute right-1 top-2 bottom-2 w-1 rounded-full bg-sky-400" />
+            </div>
+          </div>
         </div>
       </div>
 

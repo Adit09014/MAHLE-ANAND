@@ -143,6 +143,86 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
         </div>
       </Card>
 
+      {/* 2. Panel Judging System & Evaluation Guidelines Instruction Box */}
+      <Card className="p-6 bg-white border border-slate-200/80 shadow-xs rounded-2xl space-y-4">
+        <div className="grid gap-6 lg:grid-cols-12 items-start">
+          {/* Left Side Table (7 cols on lg) */}
+          <div className="lg:col-span-7 overflow-hidden rounded-xl border border-slate-300">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-[#0A2540] text-white font-bold">
+                  <th className="py-2.5 px-4 w-1/3 border-r border-blue-900/40">Item</th>
+                  <th className="py-2.5 px-4">Detail</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-slate-100/80 text-slate-800">
+                <tr>
+                  <td className="py-2.5 px-4 font-bold text-blue-950 border-r border-slate-200">Judge score</td>
+                  <td className="py-2.5 px-4">Single numeric score <strong>0–10</strong> per judge (integer or one decimal allowed).</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 px-4 font-bold text-blue-950 border-r border-slate-200">Panel score</td>
+                  <td className="py-2.5 px-4">
+                    <div className="inline-flex items-center gap-1.5 font-medium">
+                      <span>PanelScore =</span>
+                      <span className="inline-flex flex-col items-center justify-center text-center px-1 font-mono">
+                        <span className="border-b border-slate-800 pb-0.5 text-[11px] font-bold">Judge1 + Judge2 + Judge3</span>
+                        <span className="pt-0.5 text-[11px] font-bold">3</span>
+                      </span>
+                      <span>(scale 0–10).</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 px-4 font-bold text-blue-950 border-r border-slate-200">Winner selection</td>
+                  <td className="py-2.5 px-4">Nominee with highest <strong>PanelScore</strong> wins the award for the month.</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 px-4 font-bold text-blue-950 border-r border-slate-200">Monthly points awarded</td>
+                  <td className="py-2.5 px-4">Winner receives <strong>10 points</strong> recorded in HR tracker.</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 px-4 font-bold text-blue-950 border-r border-slate-200">Year-end conversion</td>
+                  <td className="py-2.5 px-4">Cumulative monthly points feed into the monthly component of the year-end R&amp;R (as previously defined).</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Right Side Scoring Criteria Box & Example (5 cols on lg) */}
+          <div className="lg:col-span-5 space-y-4">
+            {/* Top Bordered Box */}
+            <div className="rounded-xl border-2 border-[#0A2540] bg-white p-4 text-xs text-blue-950">
+              <ul className="space-y-2 list-disc pl-4 font-medium leading-relaxed">
+                <li>
+                  <strong>9–10:</strong> Exceptional evidence and clear measurable impact; strong alignment.
+                </li>
+                <li>
+                  <strong>7–8:</strong> Strong evidence and good impact; minor gaps
+                </li>
+                <li>
+                  <strong>4–6:</strong> Moderate evidence; some impact but limited specificity.
+                </li>
+                <li>
+                  <strong>0–3:</strong> Weak or no evidence; vague claims.
+                </li>
+              </ul>
+            </div>
+
+            {/* Bottom Example Section */}
+            <div className="space-y-1.5 text-xs text-slate-800 pt-1">
+              <h4 className="text-sm font-bold text-blue-950 tracking-tight">Example</h4>
+              <p className="leading-relaxed">
+                Judge scores: 8, 9, 8 &rarr; Panel Score = (8 + 9 + 8)/3 = 8.33 .
+              </p>
+              <p className="leading-relaxed">
+                Highest Panel Score across nominees wins and receives <strong>10 monthly points</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {!open && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
           <Lock size={15} className="shrink-0" />

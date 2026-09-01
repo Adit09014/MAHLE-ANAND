@@ -62,20 +62,40 @@ export const MAX_CATEGORIES_PER_FUNCTION = 2;
 export const MAX_CATEGORIES_PER_PLANT = 4;
 export const MAX_CATEGORIES_PER_UNIT = 2;
 export const PANEL_SIZE = 3;
-export const PRIZE = 2000;
 export const POINTS = 10;
 
 export const catById = (id: string): Category | undefined =>
   CATEGORIES.find((c) => c.id === id);
 
-export const unitById = (id: string): Unit | undefined =>
-  UNITS.find((u) => u.id === id);
+export const unitById = (id: string): Unit => {
+  if (!id) return { id: "", name: "N/A", kind: "Department" };
+  return {
+    id: id,
+    name: id, // Exact text from Database
+    kind: "Department",
+  };
+};
+
+export function getDynamicUnits(allEmployees: { unitId?: string }[] = []): Unit[] {
+  const map = new Map<string, Unit>();
+
+  // Extract ONLY actual department names present in database records
+  for (const emp of allEmployees) {
+    if (!emp.unitId || !emp.unitId.trim()) continue;
+    const name = emp.unitId.trim();
+    const key = name.toLowerCase();
+    if (!map.has(key)) {
+      map.set(key, {
+        id: name,
+        name: name,
+        kind: "Department",
+      });
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export function getMaxCategoriesForUnit(unitId?: string): number {
-  if (!unitId) return 2;
-  const unit = unitById(unitId);
-  if (unit && unit.kind === "Plant") {
-    return 4;
-  }
   return 2;
 }

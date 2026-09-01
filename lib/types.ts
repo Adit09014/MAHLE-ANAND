@@ -1,4 +1,4 @@
-export type UnitKind = "Function" | "Plant";
+export type UnitKind = "Function" | "Plant" | "Department";
 
 export interface Unit {
   id: string;
@@ -100,6 +100,7 @@ export interface AuthUser {
   isPanelJudge?: boolean;
   isAdmin?: boolean;
   gender?: string;
+  location?: string;
 }
 
 export interface AuthSession {

@@ -49,6 +49,8 @@ export interface NominateViewProps {
 }
 
 export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, currentUser, locked }) => {
+  const isHOD = Boolean(currentUser?.isHOD) || currentUser?.role === "hod";
+
   const [f, setF] = useState({
     name: currentUser?.name || "",
     code: currentUser?.code || "",
@@ -75,6 +77,20 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
       }));
     }
   }, [currentUser]);
+
+  if (isHOD) {
+    return (
+      <Card className="p-8 text-center space-y-4 max-w-xl mx-auto my-12 bg-white border border-amber-200 shadow-sm rounded-2xl">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+          <ShieldAlert size={28} />
+        </div>
+        <h3 className="text-lg font-bold text-blue-950">Self-Nomination Restricted for HODs</h3>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          As a Head of Department (HOD), your role is to evaluate and endorse nominees submitted by your department members. HODs cannot file self-nominations.
+        </p>
+      </Card>
+    );
+  }
 
   const timeline = getCycleTimeline(cycle);
   const nomPhase = timeline.nomination;

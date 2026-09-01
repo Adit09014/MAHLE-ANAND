@@ -102,7 +102,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { code, name, role, isPanelJudge, isHOD, isAdmin, unitId, gender } = body;
+    const { code, name, email, location, role, isPanelJudge, isHOD, isAdmin, unitId, gender } = body;
 
     if (!code || !String(code).trim()) {
       return NextResponse.json({ error: "Employee code is required." }, { status: 400 });
@@ -110,28 +110,32 @@ export async function POST(request: Request) {
 
     const empCode = String(code).trim().toUpperCase();
     const empName = String(name || "").trim() || `Employee ${empCode}`;
+    const workEmail = String(email || body.work_email || "").trim();
+    const workLocation = String(location || "").trim();
     const pool = await getPool();
 
     const isSettingHOD = Boolean(isHOD);
     const isSettingAdmin = Boolean(isAdmin) || role === "admin";
-    const resolvedRole = role || (isSettingAdmin ? "admin" : isSettingHOD ? "hod" : "employee");
+    const resolvedRole = role || (isSettingAdmin ? "admin" : "employee");
     const designation = isSettingAdmin ? "System Admin" : role === "hr" ? "HR Admin" : isSettingHOD ? "Department Head" : "Staff Member";
 
     // 1. Upsert into dbo.Employees (creates employee record if new, or updates details if exists)
     const empUpsertReq = pool.request();
     empUpsertReq.input("emp_no", sql.NVarChar, empCode);
     empUpsertReq.input("displayName", sql.NVarChar, empName);
+    empUpsertReq.input("work_email", sql.NVarChar, workEmail);
     empUpsertReq.input("department", sql.NVarChar, unitId || "hr");
+    empUpsertReq.input("location", sql.NVarChar, workLocation);
     empUpsertReq.input("designation", sql.NVarChar, designation);
 
     await empUpsertReq.query(`
       MERGE ${TABLE} AS target
-      USING (VALUES (@emp_no, @displayName, @department, @designation)) AS source (Emp_No, DisplayName, Department, Designation)
+      USING (VALUES (@emp_no, @displayName, @work_email, @department, @location, @designation)) AS source (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
       ON target.Emp_No = source.Emp_No
       WHEN MATCHED THEN
-        UPDATE SET DisplayName = source.DisplayName, Department = source.Department, Designation = source.Designation
+        UPDATE SET DisplayName = source.DisplayName, Work_Email = source.Work_Email, Department = source.Department, Location = source.Location, Designation = source.Designation
       WHEN NOT MATCHED THEN
-        INSERT (Emp_No, DisplayName, Department, Designation) VALUES (source.Emp_No, source.DisplayName, source.Department, source.Designation);
+        INSERT (Emp_No, DisplayName, Work_Email, Department, Location, Designation) VALUES (source.Emp_No, source.DisplayName, source.Work_Email, source.Department, source.Location, source.Designation);
     `);
 
     // 2. Single HOD Per Department Enforcement (clears IsHOD flag for others in dept)
@@ -196,7 +200,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { code, role, isPanelJudge, isHOD, isAdmin, unitId, name, gender, newPassword, resetPassword, adminPassword } = body;
+    const { code, role, isPanelJudge, isHOD, isAdmin, unitId, name, email, location, gender, newPassword, resetPassword, adminPassword } = body;
 
     if (!adminPassword?.trim()) {
       return NextResponse.json(
@@ -250,7 +254,7 @@ export async function PUT(request: Request) {
     const checkEmpReq = pool.request();
     checkEmpReq.input("emp_no", sql.NVarChar, empCode);
     const empResult = await checkEmpReq.query(
-      `SELECT e.Emp_No, e.Department, r.Role, r.IsAdmin FROM ${TABLE} e LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No WHERE e.Emp_No = @emp_no`
+      `SELECT e.Emp_No, e.DisplayName, e.Department, r.Role, r.IsAdmin, r.IsHOD, r.IsPanelJudge FROM ${TABLE} e LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No WHERE e.Emp_No = @emp_no`
     );
 
     if (!empResult.recordset.length) {
@@ -260,19 +264,19 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Security check: Only Admins can set or grant isAdmin = true
-    if (isAdmin !== undefined) {
-      const isRequesterAdmin = adminUser.role === "admin" || adminUser.isAdmin;
-      if (!isRequesterAdmin && isAdmin) {
+    // Security check: Allow HR/Admin session users to set or grant isAdmin = true
+    if (isAdmin !== undefined && isAdmin) {
+      const isRequesterAdmin = adminUser.role === "admin" || adminUser.role === "hr" || Boolean(adminUser.isAdmin);
+      if (!isRequesterAdmin) {
         return NextResponse.json(
-          { error: "Only a System Admin can grant Admin privileges." },
+          { error: "Only an authorized Admin can grant Admin privileges." },
           { status: 403 }
         );
       }
     }
 
-    // Update dbo.Employees fields (Department, DisplayName) if provided
-    if (unitId || name) {
+    // Update dbo.Employees fields (Department, DisplayName, Work_Email, Location) if provided
+    if (unitId || name || email !== undefined || location !== undefined) {
       const updateEmpReq = pool.request();
       updateEmpReq.input("emp_no", sql.NVarChar, empCode);
       const setClauses: string[] = [];
@@ -284,18 +288,26 @@ export async function PUT(request: Request) {
         updateEmpReq.input("displayName", sql.NVarChar, name.trim());
         setClauses.push("DisplayName = @displayName");
       }
+      if (email !== undefined) {
+        updateEmpReq.input("work_email", sql.NVarChar, String(email).trim());
+        setClauses.push("Work_Email = @work_email");
+      }
+      if (location !== undefined) {
+        updateEmpReq.input("location", sql.NVarChar, String(location).trim());
+        setClauses.push("Location = @location");
+      }
       if (setClauses.length > 0) {
         await updateEmpReq.query(`UPDATE ${TABLE} SET ${setClauses.join(", ")} WHERE Emp_No = @emp_no`);
       }
     }
 
-    // Update dbo.EmpRoles if role/isHOD/isPanelJudge/isAdmin provided
-    if (role !== undefined || isHOD !== undefined || isPanelJudge !== undefined || isAdmin !== undefined) {
+    // Update dbo.EmpRoles if role/isHOD/isPanelJudge/isAdmin/gender provided
+    if (role !== undefined || isHOD !== undefined || isPanelJudge !== undefined || isAdmin !== undefined || gender !== undefined) {
       const currentRole = empResult.recordset[0]?.Role || "employee";
       const currentIsAdmin = Boolean(empResult.recordset[0]?.IsAdmin);
-      const isSettingHOD = isHOD !== undefined ? Boolean(isHOD) : false;
+      const isSettingHOD = isHOD !== undefined ? Boolean(isHOD) : Boolean(empResult.recordset[0]?.IsHOD);
       const isSettingAdmin = isAdmin !== undefined ? Boolean(isAdmin) : (role === "admin" || currentIsAdmin);
-      const resolvedRole = role || (isSettingAdmin ? "admin" : currentRole);
+      const resolvedRole = role !== undefined ? role : (isSettingAdmin ? "admin" : currentRole);
 
       // Single HOD Per Department Enforcement (clears IsHOD flag for others in dept)
       if (isSettingHOD) {

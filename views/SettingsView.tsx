@@ -20,7 +20,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Gender Profile state
+  const [genderInput, setGenderInput] = useState(currentUser?.gender || "");
+  const [genderSuccess, setGenderSuccess] = useState<string | null>(null);
+  const [genderError, setGenderError] = useState<string | null>(null);
+  const [genderSaving, setGenderSaving] = useState(false);
+
   const unitObj = currentUser?.unitId ? unitById(currentUser.unitId) : null;
+
+  const handleSaveGenderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGenderError(null);
+    setGenderSuccess(null);
+    setGenderSaving(true);
+
+    try {
+      const res = await fetch("/api/auth/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gender: genderInput }),
+      });
+
+      const data = await res.json();
+      setGenderSaving(false);
+
+      if (!res.ok) {
+        setGenderError(data.error || "Failed to update gender.");
+      } else {
+        setGenderSuccess("Gender profile updated successfully!");
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+    } catch (err) {
+      setGenderSaving(false);
+      setGenderError("Network error while updating gender.");
+    }
+  };
 
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +120,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
               User Profile &amp; Password Settings
             </h1>
             <p className="text-xs text-slate-500">
-              Manage your profile credentials and security options for MAHLE ANAND Corporate Rewards.
+              Manage your profile credentials and security options for MAHLE ANAND Filter System Corporate Rewards.
             </p>
           </div>
         </div>
@@ -147,6 +183,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentUser }) => {
               <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
                 <CheckCircle2 size={13} /> Active Verified
               </span>
+            </div>
+
+            {/* Gender Profile Setting Form */}
+            <div className="pt-2 border-t border-slate-100">
+              <form onSubmit={handleSaveGenderSubmit} className="space-y-2">
+                <Label>Gender Profile (Optional)</Label>
+                {genderError && (
+                  <div className="p-2 text-[11px] rounded-lg bg-red-50 text-red-700 border border-red-200">
+                    {genderError}
+                  </div>
+                )}
+                {genderSuccess && (
+                  <div className="p-2 text-[11px] rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {genderSuccess}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <select
+                    value={genderInput}
+                    onChange={(e) => setGenderInput(e.target.value)}
+                    className="flex-1 rounded-xl border border-blue-900/15 bg-white px-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700"
+                  >
+                    <option value="">-- Not Specified (NULL) --</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <Button type="submit" disabled={genderSaving} className="shrink-0 text-xs py-2 px-3">
+                    {genderSaving ? "Saving..." : "Save Gender"}
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         </Card>

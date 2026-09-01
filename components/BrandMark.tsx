@@ -17,7 +17,7 @@ export const BrandMark: React.FC<BrandMarkProps> = ({ url, className, bgWhite })
   const imgElement = (
     <img
       src={logoSrc}
-      alt="MAHLE ANAND"
+      alt="MAHLE ANAND Filter System"
       onError={() => setFailed(true)}
       className={`h-14 sm:h-16 lg:h-20 w-30 max-w-[280px] object-contain ${className || ""}`}
     />

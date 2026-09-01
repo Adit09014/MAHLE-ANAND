@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MAHLE ANAND - Rewards & Recognition",
+  title: "MAHLE ANAND Filter System - Rewards & Recognition",
   description: "Rewards & Recognition monthly cycle management system",
   icons: {
     icon: "/favicon.svg",
