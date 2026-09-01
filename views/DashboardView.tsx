@@ -20,8 +20,8 @@ import {
   Building2,
   Sliders,
 } from "lucide-react";
-import { catById, unitById, UNITS, POINTS, STAGES, getMaxCategoriesForUnit } from "../lib/constants";
-import { Cycle, PointsState, AuthUser } from "../lib/types";
+import { catById, unitById, POINTS, STAGES, getMaxCategoriesForUnit, getDynamicUnits } from "../lib/constants";
+import { Cycle, PointsState, AuthUser, Unit } from "../lib/types";
 import {
   results,
   endorsedList,
@@ -63,6 +63,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const hodUnitId = currentUser?.unitId || "hr";
   const hodUnitObj = unitById(hodUnitId);
 
+  const [allEmployees, setAllEmployees] = React.useState<{ unitId?: string }[]>([]);
+
+  React.useEffect(() => {
+    async function fetchEmps() {
+      try {
+        const res = await fetch("/api/employees");
+        if (res.ok) {
+          const data = await res.json();
+          setAllEmployees(data.employees || []);
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    fetchEmps();
+  }, []);
+
+  const activeUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
+
   // Calculate timeline phase details
   const timeline = getCycleTimeline(cycle);
   const stageIdx = STAGES.findIndex((s) => s.id === cycle.stage);
@@ -74,7 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // 2. Departments that completed Max Endorsement Pushes
   const deptsQuotaCompletedCount = useMemo(() => {
     let count = 0;
-    UNITS.forEach((u) => {
+    activeUnits.forEach((u) => {
       const picks = cycle?.endorsed?.[u.id] || {};
       const filledCount = Object.keys(picks).filter((c) => picks[c]).length;
       const maxQuota = getMaxCategoriesForUnit(u.id);
@@ -83,7 +102,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }
     });
     return count;
-  }, [cycle?.endorsed]);
+  }, [cycle?.endorsed, activeUnits]);
 
   // 3. Panel Judges Assigned & Month's Panel Names
   const assignedJudges = useMemo(() => {
@@ -98,7 +117,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // 4. Department-Wise Applied Employee Count & Status List
   const deptStatsList = useMemo(() => {
-    return UNITS.map((u) => {
+    return activeUnits.map((u) => {
       const unitNoms = (cycle?.nominations || []).filter((n) => n.unit === u.id);
       const picks = cycle?.endorsed?.[u.id] || {};
       const endorsedCount = Object.keys(picks).filter((c) => picks[c]).length;
@@ -111,16 +130,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isFullQuota: endorsedCount >= maxQuota,
       };
     });
-  }, [cycle?.nominations, cycle?.endorsed]);
+  }, [cycle?.nominations, cycle?.endorsed, activeUnits]);
 
   // 5. Leaderboard of Top 3 Depts by Titles Won
   const topDeptsLeaderboard = useMemo(() => {
     const deptWinsMap: Record<
       string,
-      { unit: typeof UNITS[0]; totalWins: number; winsList: Array<{ name: string; categoryTitle: string }> }
+      { unit: Unit; totalWins: number; winsList: Array<{ name: string; categoryTitle: string }> }
     > = {};
 
-    UNITS.forEach((u) => {
+    activeUnits.forEach((u) => {
       deptWinsMap[u.id] = { unit: u, totalWins: 0, winsList: [] };
     });
 
@@ -137,7 +156,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return Object.values(deptWinsMap)
       .sort((a, b) => b.totalWins - a.totalWins)
       .slice(0, 3);
-  }, [points]);
+  }, [points, activeUnits]);
 
   // --- HOD SPECIFIC CALCULATIONS ---
   const deptWinsList = useMemo(() => {
@@ -406,7 +425,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-black tracking-tight text-blue-950">
                 {deptsQuotaCompletedCount}
-                <span className="text-base font-bold text-slate-400"> / {UNITS.length}</span>
+                <span className="text-base font-bold text-slate-400"> / {activeUnits.length}</span>
               </span>
               <span className="text-xs font-semibold text-blue-900/60">
                 Depts Filled Quota
@@ -415,7 +434,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-3 flex items-center justify-between text-xs text-blue-900/60 font-medium">
               <span>Depts Completed Quota Pushes</span>
               <span className="font-semibold text-sky-700">
-                {Math.round((deptsQuotaCompletedCount / UNITS.length) * 100)}% Rate
+                {Math.round((deptsQuotaCompletedCount / (activeUnits.length || 1)) * 100)}% Rate
               </span>
             </div>
           </Card>

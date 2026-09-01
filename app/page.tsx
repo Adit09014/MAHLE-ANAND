@@ -55,7 +55,7 @@ export default function RRAdmin() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [role, setRole] = useState<TabId>("dashboard");
-  const [asUnit, setAsUnit] = useState(UNITS[0].id);
+  const [asUnit, setAsUnit] = useState("HR");
   const [asJudge, setAsJudge] = useState("j1");
 
   // Mobile menu & Help Center state
@@ -269,18 +269,9 @@ export default function RRAdmin() {
             {/* Unit selector for HOD or HR */}
             {activeRole === "hod" && (
               <div className="flex items-center gap-2">
-                <select
-                  value={asUnit}
-                  disabled={currentUser?.role === "hod"}
-                  onChange={(e) => setAsUnit(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 shadow-xs"
-                >
-                  {UNITS.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.kind === "Plant" ? `Plant — ${u.name}` : u.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 shadow-xs">
+                  {asUnit}
+                </div>
                 {currentUser?.role === "hod" && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
                     <Lock size={12} /> Assigned Unit

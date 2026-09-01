@@ -322,18 +322,14 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
               title="Locked to your registered profile"
             />
           </Field>
-          <Field label="Department / Plant (Auto-Filled)">
-            <select
+          <Field label="Department / Unit (Auto-Filled)">
+            <input
+              type="text"
               className={readOnlyCls}
-              value={f.unit}
+              value={unitById(f.unit)?.name || f.unit}
+              readOnly
               disabled
-            >
-              {UNITS.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.kind === "Plant" ? `Plant — ${u.name}` : u.name}
-                </option>
-              ))}
-            </select>
+            />
           </Field>
           <Field label="Award Category">
             <select

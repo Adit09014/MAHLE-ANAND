@@ -1,9 +1,12 @@
 import { Cycle, Branding, PointsState } from "./types";
 import { emptyCycle } from "./helpers";
 
-export const cycleKey = (m: string) => `rr:cycle:${m}`;
-export const POINTS_KEY = "rr:points";
-export const BRAND_KEY = "rr:branding";
+/**
+ * 100% SQL SERVER (SSMS) STORAGE LAYER
+ * ALL application state (cycles, nominations, points, branding) is strictly stored
+ * in SQL Server (Rewards database: dbo.Cycles, dbo.Points, dbo.Branding).
+ * Zero localStorage is used.
+ */
 
 export async function loadCycle(month: string): Promise<Cycle> {
   try {
@@ -15,24 +18,14 @@ export async function loadCycle(month: string): Promise<Cycle> {
       }
     }
   } catch (e) {
-    /* fallback to local storage if API route fails */
+    console.error("[loadCycle] Error fetching cycle from SSMS:", e);
   }
 
-  // Fallback to localStorage
-  try {
-    if (typeof window !== "undefined") {
-      const val = window.localStorage.getItem(cycleKey(month));
-      if (val) return { ...emptyCycle(month), ...JSON.parse(val) };
-    }
-  } catch (e) {
-    /* fallback error */
-  }
-
+  // Always return a clean empty cycle when SSMS has no data
   return emptyCycle(month);
 }
 
 export async function saveCycle(cycle: Cycle): Promise<void> {
-  // Save to MongoDB API
   try {
     await fetch(`/api/cycles/${cycle.month}`, {
       method: "POST",
@@ -40,16 +33,7 @@ export async function saveCycle(cycle: Cycle): Promise<void> {
       body: JSON.stringify(cycle),
     });
   } catch (e) {
-    /* network fallback */
-  }
-
-  // Also save to localStorage
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(cycleKey(cycle.month), JSON.stringify(cycle));
-    } catch (e) {
-      /* ignore */
-    }
+    console.error("[saveCycle] Error saving cycle to SSMS:", e);
   }
 }
 
@@ -60,17 +44,9 @@ export async function loadBranding(): Promise<Branding> {
       return await res.json();
     }
   } catch (e) {
-    /* network fallback */
+    console.error("[loadBranding] Error fetching branding from SSMS:", e);
   }
 
-  try {
-    if (typeof window !== "undefined") {
-      const val = window.localStorage.getItem(BRAND_KEY);
-      if (val) return JSON.parse(val);
-    }
-  } catch (e) {
-    /* ignore */
-  }
   return { logoUrl: "" };
 }
 
@@ -82,15 +58,7 @@ export async function saveBranding(branding: Branding): Promise<void> {
       body: JSON.stringify(branding),
     });
   } catch (e) {
-    /* network fallback */
-  }
-
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(BRAND_KEY, JSON.stringify(branding));
-    } catch (e) {
-      /* ignore */
-    }
+    console.error("[saveBranding] Error saving branding to SSMS:", e);
   }
 }
 
@@ -102,17 +70,9 @@ export async function loadPoints(): Promise<PointsState> {
       return data.points || {};
     }
   } catch (e) {
-    /* network fallback */
+    console.error("[loadPoints] Error fetching points from SSMS:", e);
   }
 
-  try {
-    if (typeof window !== "undefined") {
-      const val = window.localStorage.getItem(POINTS_KEY);
-      if (val) return JSON.parse(val);
-    }
-  } catch (e) {
-    /* ignore */
-  }
   return {};
 }
 
@@ -124,14 +84,6 @@ export async function savePoints(points: PointsState): Promise<void> {
       body: JSON.stringify(points),
     });
   } catch (e) {
-    /* network fallback */
-  }
-
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(POINTS_KEY, JSON.stringify(points));
-    } catch (e) {
-      /* ignore */
-    }
+    console.error("[savePoints] Error saving points to SSMS:", e);
   }
 }

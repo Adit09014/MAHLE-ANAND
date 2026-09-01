@@ -1,21 +1,6 @@
 import { Unit, Category, Stage } from "./types";
 
-export const UNITS: Unit[] = [
-  { id: "hr", name: "HR", kind: "Function" },
-  { id: "fin", name: "Finance", kind: "Function" },
-  { id: "cpur", name: "Central Purchase", kind: "Function" },
-  { id: "cproc", name: "Central Process", kind: "Function" },
-  { id: "rnd", name: "R&D", kind: "Function" },
-  { id: "cq", name: "Central Quality", kind: "Function" },
-  { id: "scm", name: "SCM", kind: "Function" },
-  { id: "ops", name: "Operation", kind: "Function" },
-  { id: "oem", name: "OE Marketing", kind: "Function" },
-  { id: "pm", name: "Project Management", kind: "Function" },
-  { id: "khandsa", name: "Khandsa", kind: "Plant" },
-  { id: "pune", name: "Pune", kind: "Plant" },
-  { id: "parwanoo", name: "Parwanoo", kind: "Plant" },
-  { id: "chennai", name: "Chennai", kind: "Plant" },
-];
+export const UNITS: Unit[] = [];
 
 export const CATEGORIES: Category[] = [
   {
