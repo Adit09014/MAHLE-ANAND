@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -26,7 +26,7 @@ import {
   Bell,
   Settings,
 } from "lucide-react";
-import { UNITS, STAGES, POINTS } from "../lib/constants";
+import { UNITS, STAGES, POINTS, getDynamicUnits } from "../lib/constants";
 import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
 import { loadCycle, saveCycle, loadBranding, loadPoints } from "../lib/storage";
 import { getAuthSession, logoutUser } from "../lib/auth";
@@ -62,6 +62,25 @@ export default function RRAdmin() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
+  const [allEmployees, setAllEmployees] = useState<Array<{ unitId?: string }>>([]);
+
+  useEffect(() => {
+    async function fetchEmps() {
+      try {
+        const res = await fetch("/api/employees");
+        if (res.ok) {
+          const data = await res.json();
+          setAllEmployees(data.employees || []);
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    fetchEmps();
+  }, []);
+
+  const dynamicUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
+
   // Load session from cookie and set RBAC role defaults
   useEffect(() => {
     async function checkAuth() {
@@ -77,8 +96,8 @@ export default function RRAdmin() {
     checkAuth();
   }, []);
 
-  const refresh = useCallback(async (m: string) => {
-    setLoading(true);
+  const refresh = useCallback(async (m: string, silent = false) => {
+    if (!silent) setLoading(true);
     setErr(null);
     try {
       const [c, p, b] = await Promise.all([
@@ -90,13 +109,28 @@ export default function RRAdmin() {
       setPoints(p);
       setBrand(b);
     } catch (e) {
-      setErr("Couldn't reach shared storage. Try refreshing the cycle.");
+      if (!silent) setErr("Couldn't reach shared storage. Try refreshing the cycle.");
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   useEffect(() => {
     refresh(month);
+  }, [month, refresh]);
+
+  // Auto-sync cycle data periodically in the background (every 8s) and on window focus
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refresh(month, true);
+    }, 8000);
+
+    const onFocus = () => refresh(month, true);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [month, refresh]);
 
   const handleLogout = async () => {
@@ -108,7 +142,81 @@ export default function RRAdmin() {
   const commit = async (next: Cycle) => {
     setCycle(next);
     try {
-      await saveCycle(next);
+      // Always fetch the latest DB state first to avoid overwriting concurrent changes
+      const fresh = await loadCycle(next.month);
+      
+      // Merge: use the fresh DB data as baseline, overlay only the fields that changed
+      const merged: Cycle = {
+        ...fresh,
+        stage: next.stage,
+        judges: next.judges,
+        timeline: next.timeline,
+        announcedAt: next.announcedAt !== undefined ? next.announcedAt : fresh.announcedAt,
+      };
+
+      // Merge nominations: prefer the version with more recent submittedAt, keep all
+      const nomMap = new Map<string, any>();
+      (fresh.nominations || []).forEach((n: any) => nomMap.set(n.id, n));
+      (next.nominations || []).forEach((n: any) => {
+        const existing = nomMap.get(n.id);
+        if (!existing) {
+          nomMap.set(n.id, n);
+        } else {
+          // Keep whichever has the later submittedAt, or the incoming one
+          const existTs = new Date(existing.submittedAt || 0).getTime();
+          const nextTs = new Date(n.submittedAt || 0).getTime();
+          nomMap.set(n.id, nextTs >= existTs ? n : existing);
+        }
+      });
+      merged.nominations = Array.from(nomMap.values());
+
+      // Merge endorsed: for units the incoming payload explicitly touches, incoming is
+      // authoritative (allows withdrawals). For units NOT in incoming, keep DB values
+      // (prevents stale Admin state from wiping HOD endorsements).
+      const mergedEndorsed: Record<string, Record<string, string>> = {};
+      // Start with fresh DB endorsements for ALL units
+      if (fresh.endorsed) {
+        Object.keys(fresh.endorsed).forEach((uId) => {
+          mergedEndorsed[uId] = { ...(fresh.endorsed[uId] || {}) };
+        });
+      }
+      // For units explicitly in the incoming payload, REPLACE with incoming.
+      // Withdrawal signals (empty strings) are passed through to the server.
+      if (next.endorsed) {
+        Object.keys(next.endorsed).forEach((uId) => {
+          mergedEndorsed[uId] = { ...(next.endorsed[uId] || {}) };
+        });
+      }
+      merged.endorsed = mergedEndorsed;
+
+      // Merge scores: combine scores, process -1 as a deletion signal
+      const mergedScores: Record<string, Record<string, number>> = { ...(fresh.scores || {}) };
+      if (next.scores) {
+        Object.keys(next.scores).forEach((nomId) => {
+          const incoming = next.scores[nomId] || {};
+          const existing = mergedScores[nomId] || {};
+          const combined = { ...existing, ...incoming };
+          
+          Object.keys(combined).forEach((jId) => {
+            if (combined[jId] === -1) {
+              delete combined[jId];
+            }
+          });
+
+          if (Object.keys(combined).length > 0) {
+            mergedScores[nomId] = combined;
+          } else {
+            delete mergedScores[nomId];
+          }
+        });
+      }
+      merged.scores = mergedScores;
+
+      setCycle(merged);
+      const saved = await saveCycle(merged);
+      if (saved) {
+        setCycle(saved);
+      }
       setErr(null);
     } catch (e) {
       setErr("That change didn't save. Refresh the cycle and try again.");
@@ -269,10 +377,24 @@ export default function RRAdmin() {
             {/* Unit selector for HOD or HR */}
             {activeRole === "hod" && (
               <div className="flex items-center gap-2">
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 shadow-xs">
-                  {asUnit}
-                </div>
-                {currentUser?.role === "hod" && (
+                {isHrOrAdmin ? (
+                  <select
+                    value={asUnit}
+                    onChange={(e) => setAsUnit(e.target.value)}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 shadow-xs outline-none focus:border-blue-700"
+                  >
+                    {dynamicUnits.map((u: { id: string; name: string }) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 shadow-xs">
+                    {asUnit}
+                  </div>
+                )}
+                {!isHrOrAdmin && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
                     <Lock size={12} /> Assigned Unit
                   </span>
@@ -397,7 +519,7 @@ export default function RRAdmin() {
                   cycle={cycle}
                   commit={commit}
                   locked={locked}
-                  readOnly={currentUser?.role === "hr"}
+                  readOnly={currentUser?.role === "hr" || currentUser?.role === "admin"}
                 />
               )}
               {activeRole === "judge" && (

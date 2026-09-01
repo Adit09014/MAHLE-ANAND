@@ -297,7 +297,32 @@ export const HrView: React.FC<HrViewProps> = ({
         setStageAuthAction(null);
 
         if (action.type === "change_stage") {
-          commit({ ...cycle, stage: action.targetStage });
+          // When reverting FROM announced to any other stage, clear LSIP points for this cycle month
+          if (cycle.stage === "announced" && action.targetStage !== "announced") {
+            const cleanedPoints = { ...points };
+            Object.keys(cleanedPoints).forEach((empCode) => {
+              const rec = cleanedPoints[empCode];
+              if (!rec) return;
+              const winsForMonth = rec.wins.filter((w) => w.month === cycle.month);
+              if (winsForMonth.length > 0) {
+                // Subtract points that were added for this month
+                const monthPoints = winsForMonth.reduce((sum, w) => sum + (w.score || 0), 0);
+                rec.points = Math.round((rec.points - monthPoints) * 10) / 10;
+                rec.wins = rec.wins.filter((w) => w.month !== cycle.month);
+                // Remove employee record entirely if no wins remain
+                if (rec.wins.length === 0) {
+                  delete cleanedPoints[empCode];
+                }
+              }
+            });
+            setPoints(cleanedPoints);
+            try {
+              await savePoints(cleanedPoints);
+            } catch (e) {
+              /* ignore */
+            }
+          }
+          commit({ ...cycle, stage: action.targetStage, announcedAt: action.targetStage === "announced" ? cycle.announcedAt : null });
         } else if (action.type === "announce_winner") {
           await announce();
         }

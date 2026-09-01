@@ -25,16 +25,23 @@ export async function loadCycle(month: string): Promise<Cycle> {
   return emptyCycle(month);
 }
 
-export async function saveCycle(cycle: Cycle): Promise<void> {
+export async function saveCycle(cycle: Cycle): Promise<Cycle> {
   try {
-    await fetch(`/api/cycles/${cycle.month}`, {
+    const res = await fetch(`/api/cycles/${cycle.month}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cycle),
     });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && data.cycle) {
+        return data.cycle;
+      }
+    }
   } catch (e) {
     console.error("[saveCycle] Error saving cycle to SSMS:", e);
   }
+  return cycle;
 }
 
 export async function loadBranding(): Promise<Branding> {

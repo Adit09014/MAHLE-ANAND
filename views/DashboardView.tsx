@@ -63,7 +63,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const hodUnitId = currentUser?.unitId || "hr";
   const hodUnitObj = unitById(hodUnitId);
 
-  const [allEmployees, setAllEmployees] = React.useState<{ unitId?: string }[]>([]);
+  const [allEmployees, setAllEmployees] = React.useState<Array<{ code?: string; name?: string; unitId?: string }>>([]);
 
   React.useEffect(() => {
     async function fetchEmps() {
@@ -118,8 +118,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // 4. Department-Wise Applied Employee Count & Status List
   const deptStatsList = useMemo(() => {
     return activeUnits.map((u) => {
-      const unitNoms = (cycle?.nominations || []).filter((n) => n.unit === u.id);
-      const picks = cycle?.endorsed?.[u.id] || {};
+      const targetUnit = (u.id || "").trim().toLowerCase();
+      const unitNoms = (cycle?.nominations || []).filter((n) => {
+        const nomUnit = (n.unit || "").trim().toLowerCase();
+        if (nomUnit && nomUnit === targetUnit) return true;
+        const emp = allEmployees.find(
+          (e) => Boolean(e.code && e.code.toUpperCase() === (n.code || "").toUpperCase())
+        );
+        return Boolean(emp && emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit);
+      });
+      const matchedKey = Object.keys(cycle?.endorsed || {}).find(
+        (k) => k.trim().toLowerCase() === targetUnit
+      ) || u.id;
+      const picks = (cycle?.endorsed || {})[matchedKey] || {};
       const endorsedCount = Object.keys(picks).filter((c) => picks[c]).length;
       const maxQuota = getMaxCategoriesForUnit(u.id);
       return {
@@ -130,7 +141,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isFullQuota: endorsedCount >= maxQuota,
       };
     });
-  }, [cycle?.nominations, cycle?.endorsed, activeUnits]);
+  }, [cycle?.nominations, cycle?.endorsed, activeUnits, allEmployees]);
 
   // 5. Leaderboard of Top 3 Depts by Titles Won
   const topDeptsLeaderboard = useMemo(() => {
@@ -176,8 +187,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const deptNominations = useMemo(() => {
     if (!cycle?.nominations) return [];
-    return cycle.nominations.filter((n) => n.unit === hodUnitId);
-  }, [cycle?.nominations, hodUnitId]);
+    const targetUnit = (hodUnitId || "").trim().toLowerCase();
+    return cycle.nominations.filter((n) => {
+      const nomUnit = (n.unit || "").trim().toLowerCase();
+      if (nomUnit && nomUnit === targetUnit) return true;
+      const emp = allEmployees.find(
+        (e) => Boolean(e.code && e.code.toUpperCase() === (n.code || "").toUpperCase())
+      );
+      return Boolean(emp && emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit);
+    });
+  }, [cycle?.nominations, hodUnitId, allEmployees]);
 
   const usedPicks = cycle.endorsed[hodUnitId] || {};
   const maxHodQuota = getMaxCategoriesForUnit(hodUnitId);

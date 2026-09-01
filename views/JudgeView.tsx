@@ -83,8 +83,11 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
 
   const setScore = (nomId: string, value: number | undefined) => {
     const forNom = { ...(cycle.scores[nomId] || {}) };
-    if (value === undefined || Number.isNaN(value)) delete forNom[effectiveJudgeId];
-    else forNom[effectiveJudgeId] = Math.max(0, Math.min(10, value));
+    if (value === undefined || Number.isNaN(value)) {
+      forNom[effectiveJudgeId] = -1; // Explicit withdrawal signal for score
+    } else {
+      forNom[effectiveJudgeId] = Math.max(0, Math.min(10, value));
+    }
     commit({ ...cycle, scores: { ...cycle.scores, [nomId]: forNom } });
   };
 

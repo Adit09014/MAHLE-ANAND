@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { Lock, Clock, Calendar, CheckCircle2, ShieldAlert, FileText, Check, Edit3, X } from "lucide-react";
-import { UNITS, CATEGORIES, catById, unitById } from "../lib/constants";
+import { UNITS, CATEGORIES, catById, unitById, getDynamicUnits } from "../lib/constants";
 import { AuthUser, Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
 import Card from "../components/Card";
@@ -64,6 +64,25 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
 
   const [editingNomId, setEditingNomId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ bad: boolean; text: string } | null>(null);
+
+  const [allEmployees, setAllEmployees] = useState<Array<{ unitId?: string }>>([]);
+
+  React.useEffect(() => {
+    async function fetchEmps() {
+      try {
+        const res = await fetch("/api/employees");
+        if (res.ok) {
+          const data = await res.json();
+          setAllEmployees(data.employees || []);
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    fetchEmps();
+  }, []);
+
+  const dynamicUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
 
   // Sync profile data when currentUser updates
   React.useEffect(() => {
@@ -154,7 +173,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
   const submit = () => {
     const code = (f.code || currentUser?.code || "").trim().toUpperCase();
     const name = (f.name || currentUser?.name || "").trim();
-    const unit = f.unit || currentUser?.unitId || UNITS[0].id;
+    const unit = (currentUser?.unitId || f.unit || "").trim();
 
     if (!name || !code)
       return setMsg({ bad: true, text: "Your employee profile details could not be found." });
@@ -322,14 +341,19 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
               title="Locked to your registered profile"
             />
           </Field>
-          <Field label="Department / Unit (Auto-Filled)">
-            <input
-              type="text"
-              className={readOnlyCls}
-              value={unitById(f.unit)?.name || f.unit}
-              readOnly
-              disabled
-            />
+          <Field label="Department / Unit">
+            <select
+              className={inputCls}
+              value={f.unit}
+              disabled={!open || Boolean(editingNomId)}
+              onChange={(e) => set("unit", e.target.value)}
+            >
+              {dynamicUnits.map((u: { id: string; name: string }) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Award Category">
             <select

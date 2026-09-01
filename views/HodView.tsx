@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye } from "lucide-react";
 import { unitById, CATEGORIES, getMaxCategoriesForUnit, STAGES } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
@@ -20,9 +20,63 @@ export interface HodViewProps {
 }
 
 export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked, readOnly = false }) => {
+  const [allEmployees, setAllEmployees] = useState<Array<{ code: string; name: string; unitId: string }>>([]);
+
+  useEffect(() => {
+    async function fetchEmps() {
+      try {
+        const res = await fetch("/api/employees");
+        if (res.ok) {
+          const data = await res.json();
+          setAllEmployees(data.employees || []);
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    fetchEmps();
+  }, []);
+
   const unit = unitById(unitId);
-  const mine = cycle.nominations.filter((n) => n.unit === unitId);
-  const picks = cycle.endorsed[unitId] || {};
+
+  const mine = useMemo(() => {
+    const targetUnit = (unitId || "").trim().toLowerCase();
+    return (cycle.nominations || []).filter((n) => {
+      // 1. Direct match on nomination's stored unit
+      const nomUnit = (n.unit || "").trim().toLowerCase();
+      if (nomUnit && nomUnit === targetUnit) return true;
+
+      // 2. Lookup employee in live directory by code
+      const emp = allEmployees.find(
+        (e) => e.code.toUpperCase() === (n.code || "").toUpperCase()
+      );
+      if (emp && emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit) {
+        return true;
+      }
+
+      // 3. Fallback: match by employee name if code missing
+      if (emp && emp.name && n.name && emp.name.trim().toLowerCase() === n.name.trim().toLowerCase()) {
+        if (emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit) {
+          return true;
+        }
+      }
+
+      // 4. Guaranteed inclusion: if this nomination is endorsed for this unit
+      const matchedEndorsedKey = Object.keys(cycle.endorsed || {}).find(
+        (k) => k.trim().toLowerCase() === targetUnit
+      ) || unitId;
+      const unitPicks = (cycle.endorsed || {})[matchedEndorsedKey] || {};
+      if (Object.values(unitPicks).includes(n.id)) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [cycle.nominations, cycle.endorsed, unitId, allEmployees]);
+  const matchedKey = Object.keys(cycle.endorsed || {}).find(
+    (k) => k.trim().toLowerCase() === (unitId || "").trim().toLowerCase()
+  ) || unitId;
+  const picks = (cycle.endorsed || {})[matchedKey] || {};
   const usedCats = Object.keys(picks).filter((c) => picks[c]);
   const maxCategories = getMaxCategoriesForUnit(unitId);
   const timeline = getCycleTimeline(cycle);
@@ -34,15 +88,19 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
     if (readOnly) return;
     const next = { ...picks };
     if (next[nom.category] === nom.id) {
-      delete next[nom.category];
+      next[nom.category] = ""; // Explicit withdrawal signal for server merge
     } else {
       if (!next[nom.category] && usedCats.length >= maxCategories)
         return;
       next[nom.category] = nom.id; // Enforces 1 employee per category
     }
+    const nextNoms = (cycle.nominations || []).map((n) =>
+      n.id === nom.id ? { ...n, unit: unitId } : n
+    );
     commit({
       ...cycle,
-      endorsed: { ...cycle.endorsed, [unitId]: next },
+      nominations: nextNoms,
+      endorsed: { ...(cycle.endorsed || {}), [unitId]: next },
     });
   };
 

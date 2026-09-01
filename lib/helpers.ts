@@ -99,10 +99,12 @@ export function panelScore(cycle: Cycle, nomId: string): PanelScoreResult {
 
 export function endorsedList(cycle: Cycle): Nomination[] {
   const ids: string[] = [];
-  Object.values(cycle.endorsed).forEach((byCat) =>
-    Object.values(byCat || {}).forEach((id) => id && ids.push(id))
-  );
-  return cycle.nominations.filter((n) => ids.includes(n.id));
+  if (cycle?.endorsed) {
+    Object.values(cycle.endorsed).forEach((byCat) =>
+      Object.values(byCat || {}).forEach((id) => id && ids.push(id))
+    );
+  }
+  return (cycle?.nominations || []).filter((n) => ids.includes(n.id));
 }
 
 export function results(cycle: Cycle): CategoryResult[] {
