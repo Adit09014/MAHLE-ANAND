@@ -210,3 +210,111 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+
+-- DATABASE 
+
+USE [Rewards];
+GO
+
+INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+VALUES ('M1004', 'Sanjay Dutt', 'sanjay.dutt@company.com', 'rnd', 'Gurgaon', 'Senior Engineer');
+
+
+USE [Rewards];
+GO
+
+-- 1. Add Employee
+INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+VALUES ('M1005', 'Ananya Roy', 'ananya.roy@company.com', 'hr', 'Gurgaon', 'HR Lead');
+
+-- 2. Assign Role (Role can be 'hr', 'hod', or 'employee')
+INSERT INTO dbo.EmpRoles (Emp_No, Role, IsHOD, IsPanelJudge, Gender)
+VALUES ('M1005', 'hr', 0, 1, 'Female');
+
+
+
+USE [Rewards];
+GO
+
+INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+VALUES 
+    ('M1006', 'Rohan Mehta',   'rohan.m@company.com',   'fin', 'Mumbai',  'Financial Analyst'),
+    ('M1007', 'Kavita Reddy',  'kavita.r@company.com',  'rnd', 'Gurgaon', 'Quality Engineer'),
+    ('M1008', 'Amitabh Verma', 'amitabh.v@company.com', 'hr',  'Delhi',   'Talent Specialist');
+
+-- Assign default roles in bulk
+INSERT INTO dbo.EmpRoles (Emp_No, Role, IsHOD, IsPanelJudge, Gender)
+VALUES 
+    ('M1006', 'employee', 0, 0, 'Male'),
+    ('M1007', 'hod',      1, 0, 'Female'), -- HOD of R&D
+    ('M1008', 'employee', 0, 0, 'Male');
+
+
+USE [Rewards];
+GO
+
+MERGE dbo.Employees AS target
+USING (VALUES 
+    ('M1009', 'Neha Gupta', 'neha.g@company.com', 'fin', 'Gurgaon', 'Senior Auditor')
+) AS source (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+ON target.Emp_No = source.Emp_No
+WHEN MATCHED THEN
+    UPDATE SET 
+        DisplayName = source.DisplayName, 
+        Work_Email = source.Work_Email, 
+        Department = source.Department,
+        Location = source.Location,
+        Designation = source.Designation
+WHEN NOT MATCHED THEN
+    INSERT (Emp_No, DisplayName, Work_Email, Department, Location, Designation) 
+    VALUES (source.Emp_No, source.DisplayName, source.Work_Email, source.Department, source.Location, source.Designation);
+
+
+USE [Rewards];
+GO
+
+-- 1. Insert Employee
+INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+VALUES ('M1010', 'Deepak Joshi', 'deepak.j@company.com', 'rnd', 'Gurgaon', 'System Architect');
+
+-- 2. Insert Custom Password Hash (SHA-256 hash of 'MyCustomPass#2026')
+INSERT INTO dbo.EmpPasswords (Emp_No, PasswordHash)
+VALUES (
+    'M1010', 
+    LOWER(CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', 'MyCustomPass#2026'), 2))
+);
+
+
+SELECT 
+    e.Emp_No,
+    e.DisplayName,
+    e.Department,
+    ISNULL(r.Role, 'employee') AS [Role],
+    ISNULL(r.IsHOD, 0) AS [IsHOD],
+    CASE 
+        WHEN p.PasswordHash IS NOT NULL THEN '[Custom Hashed Password]'
+        ELSE RIGHT(TRIM(e.Emp_No), 4) + SUBSTRING(TRIM(e.DisplayName), 1, 4)
+    END AS [Active_Login_Password]
+FROM dbo.Employees e
+LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
+LEFT JOIN dbo.EmpPasswords p ON e.Emp_No = p.Emp_No;
+
+
+-- TRUNCATE
+
+USE [Rewards];
+GO
+
+-- 1. Delete dependent child tables & employees (ON DELETE CASCADE will also clean child tables)
+DELETE FROM dbo.EmpPasswords;
+DELETE FROM dbo.EmpRoles;
+DELETE FROM dbo.Employees;
+
+-- 2. Delete app state & configuration data
+DELETE FROM dbo.Cycles;
+DELETE FROM dbo.Points;
+DELETE FROM dbo.Branding;
+
+PRINT '=== All table data successfully deleted. Database structure remains intact. ===';
+GO
