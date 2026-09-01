@@ -190,7 +190,8 @@ GO
 
 
 
--- DOMAIN
+-- DOMAIN / CORS CONFIGURATION
+-- Configured in next.config.ts and middleware.ts for both localhost and reward-mahle.local:3000
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -200,9 +201,10 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         headers: [
-          { key: "Access-Control-Allow-Origin", value: "https://rewards.yourdomain.com" },
+          { key: "Access-Control-Allow-Credentials", value: "true" },
+          { key: "Access-Control-Allow-Origin", value: "*" },
           { key: "Access-Control-Allow-Methods", value: "GET,POST,PUT,DELETE,OPTIONS" },
-          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization, X-Requested-With" },
         ],
       },
     ];
