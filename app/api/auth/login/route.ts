@@ -124,12 +124,10 @@ export async function POST(request: Request) {
       gender: String(row.Gender || ""),
     };
 
-    const isHttps = request.url.startsWith("https://") || request.headers.get("x-forwarded-proto") === "https";
-
     const cookieStore = await cookies();
     cookieStore.set("rr_session", JSON.stringify(verifiedUser), {
       httpOnly: true,
-      secure: isHttps,
+      secure: process.env.COOKIE_SECURE === "true", // false by default for HTTP local network access (e.g. reward-mahle.local)
       sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 24, // 24 hours
