@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye } from "lucide-react";
-import { unitById, CATEGORIES, MAX_CATEGORIES_PER_UNIT, STAGES } from "../lib/constants";
+import { unitById, CATEGORIES, getMaxCategoriesForUnit, STAGES } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
 import Card from "../components/Card";
@@ -24,6 +24,7 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
   const mine = cycle.nominations.filter((n) => n.unit === unitId);
   const picks = cycle.endorsed[unitId] || {};
   const usedCats = Object.keys(picks).filter((c) => picks[c]);
+  const maxCategories = getMaxCategoriesForUnit(unitId);
   const timeline = getCycleTimeline(cycle);
   const hodPhase = timeline.hodEndorsement;
   const effectiveEnd = getEffectiveEndDate(hodPhase);
@@ -35,7 +36,7 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
     if (next[nom.category] === nom.id) {
       delete next[nom.category];
     } else {
-      if (!next[nom.category] && usedCats.length >= MAX_CATEGORIES_PER_UNIT)
+      if (!next[nom.category] && usedCats.length >= maxCategories)
         return;
       next[nom.category] = nom.id; // Enforces 1 employee per category
     }
@@ -63,17 +64,17 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
           <ShieldCheck size={20} className="text-blue-800 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <h4 className="font-bold text-blue-950 text-sm tracking-tight flex items-center gap-2">
-              HOD Endorsement &amp; Selection Policy
+              HOD Endorsement &amp; Selection Policy ({unit?.kind === "Plant" ? "Plant Policy — Max 4 Entries" : "Function Policy — Max 2 Entries"})
             </h4>
             <p className="text-blue-900/80 leading-relaxed">
-              Each HOD reviews entries from their department and forwards <strong>one employee per category</strong>, for a <strong>maximum of 2 categories</strong> that month.
+              Each HOD reviews entries from their {unit?.kind === "Plant" ? "plant" : "department"} and forwards <strong>one employee per category</strong>, for a <strong>maximum of {maxCategories} categories</strong> that month.
             </p>
             <div className="pt-1 flex flex-wrap items-center gap-2 font-mono text-[11px]">
               <span className="rounded-md bg-blue-900/10 px-2 py-0.5 font-semibold text-blue-900 border border-blue-900/15">
                 Rule 1: Max 1 Employee Per Category
               </span>
               <span className="rounded-md bg-blue-900/10 px-2 py-0.5 font-semibold text-blue-900 border border-blue-900/15">
-                Rule 2: Max 2 Categories Per Month ({usedCats.length}/{MAX_CATEGORIES_PER_UNIT} Used)
+                Rule 2: Max {maxCategories} Categories Per Month ({usedCats.length}/{maxCategories} Used)
               </span>
             </div>
           </div>
@@ -93,7 +94,7 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
             <p className="font-mono text-2xl leading-none tabular-nums">
               {usedCats.length}
               <span className="text-base text-blue-900/35">
-                /{MAX_CATEGORIES_PER_UNIT}
+                /{maxCategories}
               </span>
             </p>
           </div>
@@ -132,7 +133,7 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
         const pool = mine.filter((n) => n.category === cat.id);
         if (!pool.length) return null;
         const chosen = picks[cat.id];
-        const blocked = !chosen && usedCats.length >= MAX_CATEGORIES_PER_UNIT;
+        const blocked = !chosen && usedCats.length >= maxCategories;
         return (
           <div key={cat.id}>
             <div className="mb-2 flex items-center gap-3">

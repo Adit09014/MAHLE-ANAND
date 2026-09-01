@@ -58,6 +58,8 @@ export const STAGES: Stage[] = [
   { id: "announced", label: "Winners declared", window: "15th" },
 ];
 
+export const MAX_CATEGORIES_PER_FUNCTION = 2;
+export const MAX_CATEGORIES_PER_PLANT = 4;
 export const MAX_CATEGORIES_PER_UNIT = 2;
 export const PANEL_SIZE = 3;
 export const PRIZE = 2000;
@@ -68,3 +70,12 @@ export const catById = (id: string): Category | undefined =>
 
 export const unitById = (id: string): Unit | undefined =>
   UNITS.find((u) => u.id === id);
+
+export function getMaxCategoriesForUnit(unitId?: string): number {
+  if (!unitId) return 2;
+  const unit = unitById(unitId);
+  if (unit && unit.kind === "Plant") {
+    return 4;
+  }
+  return 2;
+}

@@ -20,17 +20,27 @@ import {
   Building2,
   Sliders,
 } from "lucide-react";
-import { catById, unitById, UNITS, POINTS, STAGES, MAX_CATEGORIES_PER_UNIT } from "../lib/constants";
-import { results, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
-import { AuthUser, Cycle, PointsState } from "../lib/types";
+import { catById, unitById, UNITS, POINTS, STAGES, getMaxCategoriesForUnit } from "../lib/constants";
+import { Cycle, PointsState, AuthUser } from "../lib/types";
+import {
+  results,
+  endorsedList,
+  panelScore,
+  getCycleTimeline,
+  getEffectiveEndDate,
+  formatDatePretty,
+} from "../lib/helpers";
 import Card from "../components/Card";
+import Label from "../components/Label";
+import Button from "../components/Button";
 import Pill from "../components/Pill";
+import Empty from "../components/Empty";
 
 export interface DashboardViewProps {
   cycle: Cycle;
   points: PointsState;
-  currentUser?: AuthUser | null;
-  onNavigateToNominate: () => void;
+  currentUser?: AuthUser;
+  onNavigateToNominate?: () => void;
   onNavigateToEndorse?: () => void;
   onNavigateToJudge?: () => void;
   onNavigateToHr?: () => void;
@@ -47,7 +57,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const userName = currentUser?.name || "Team Member";
   const userCode = currentUser?.code?.toUpperCase() || "";
-  const isAdmin = currentUser?.role === "hr";
+  const isAdmin = currentUser?.role === "hr" || currentUser?.role === "admin" || Boolean(currentUser?.isAdmin);
   const isHod = currentUser?.role === "hod";
   const isPanelJudge = Boolean(currentUser?.isPanelJudge);
   const hodUnitId = currentUser?.unitId || "hr";
@@ -58,16 +68,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const stageIdx = STAGES.findIndex((s) => s.id === cycle.stage);
 
   // --- ADMIN SPECIFIC CALCULATIONS ---
-  // 1. Total Nominations in cycle
-  const totalCycleNominations = cycle?.nominations?.length || 0;
+  // 1. Total Nominations Across Company
+  const totalCompanyNominations = cycle?.nominations?.length || 0;
 
-  // 2. How many Depts' HOD fill the quota
+  // 2. Departments that completed Max Endorsement Pushes
   const deptsQuotaCompletedCount = useMemo(() => {
     let count = 0;
     UNITS.forEach((u) => {
       const picks = cycle?.endorsed?.[u.id] || {};
       const filledCount = Object.keys(picks).filter((c) => picks[c]).length;
-      if (filledCount >= MAX_CATEGORIES_PER_UNIT) {
+      const maxQuota = getMaxCategoriesForUnit(u.id);
+      if (filledCount >= maxQuota) {
         count++;
       }
     });
@@ -91,11 +102,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const unitNoms = (cycle?.nominations || []).filter((n) => n.unit === u.id);
       const picks = cycle?.endorsed?.[u.id] || {};
       const endorsedCount = Object.keys(picks).filter((c) => picks[c]).length;
+      const maxQuota = getMaxCategoriesForUnit(u.id);
       return {
         unit: u,
         appliedCount: unitNoms.length,
         endorsedCount,
-        isFullQuota: endorsedCount >= MAX_CATEGORIES_PER_UNIT,
+        maxQuota,
+        isFullQuota: endorsedCount >= maxQuota,
       };
     });
   }, [cycle?.nominations, cycle?.endorsed]);
@@ -148,8 +161,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [cycle?.nominations, hodUnitId]);
 
   const usedPicks = cycle.endorsed[hodUnitId] || {};
+  const maxHodQuota = getMaxCategoriesForUnit(hodUnitId);
   const endorsedCatCount = Object.keys(usedPicks).filter((c) => usedPicks[c]).length;
-  const remainingEndorsements = Math.max(0, MAX_CATEGORIES_PER_UNIT - endorsedCatCount);
+  const remainingEndorsements = Math.max(0, maxHodQuota - endorsedCatCount);
 
   // --- EMPLOYEE SPECIFIC CALCULATIONS ---
   const userNominations = useMemo(() => {
@@ -365,7 +379,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-black tracking-tight text-blue-950">
-                {totalCycleNominations}
+                {totalCompanyNominations}
               </span>
               <span className="text-xs font-semibold text-blue-900/60">
                 Total Applied Entries
@@ -399,7 +413,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-blue-900/60 font-medium">
-              <span>Depts Completed Max {MAX_CATEGORIES_PER_UNIT} Pushes</span>
+              <span>Depts Completed Quota Pushes</span>
               <span className="font-semibold text-sky-700">
                 {Math.round((deptsQuotaCompletedCount / UNITS.length) * 100)}% Rate
               </span>
@@ -419,17 +433,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-black tracking-tight text-blue-950">
                 {assignedJudges.length}
-                <span className="text-base font-bold text-slate-400"> / {cycle.judges.length || 3}</span>
               </span>
               <span className="text-xs font-semibold text-blue-900/60">
-                Judges Active
+                Assigned Judges
               </span>
             </div>
-            <div className="mt-3 text-xs text-blue-900/80 font-medium border-t border-slate-100 pt-2">
-              <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">
-                This Month&apos;s Panel:
-              </span>
-              <span className="font-bold text-emerald-800 truncate block mt-0.5">
+            <div className="mt-3 flex items-center justify-between text-xs text-blue-900/60 font-medium truncate">
+              <span className="truncate" title={assignedJudgesNamesText}>
                 {assignedJudgesNamesText}
               </span>
             </div>
@@ -438,40 +448,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       ) : isHod ? (
         /* HOD SPECIFIC TOP CARDS */
         <div className="grid gap-5 md:grid-cols-3">
-          {/* Card 1: AWARDS WON BY DEPARTMENT */}
-          <Card className="p-6 transition-all duration-200 hover:shadow-md hover:border-blue-900/20 relative overflow-hidden bg-white">
+          <Card className="p-6 transition-all duration-200 hover:shadow-md hover:border-blue-900/20 bg-white">
             <div className="flex items-center justify-between border-b border-blue-900/5 pb-3">
               <span className="text-xs font-bold uppercase tracking-widest text-blue-900/60">
-                DEPT AWARDS WON
+                DEPARTMENT APPLICANTS
               </span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
-                <Trophy size={20} />
-              </div>
-            </div>
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-3xl font-black tracking-tight text-blue-950">
-                {deptWinsCount}
-              </span>
-              <span className="text-xs font-semibold text-blue-900/60">
-                Wins
-              </span>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs text-blue-900/60 font-medium">
-              <span>Department: <strong>{hodUnitObj?.name || hodUnitId}</strong></span>
-              <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
-                <Medal size={12} /> Total Declared Wins
-              </span>
-            </div>
-          </Card>
-
-          {/* Card 2: PENDING TOTAL APPLIED NOMINATIONS */}
-          <Card className="p-6 transition-all duration-200 hover:shadow-md hover:border-blue-900/20 relative overflow-hidden bg-white">
-            <div className="flex items-center justify-between border-b border-blue-900/5 pb-3">
-              <span className="text-xs font-bold uppercase tracking-widest text-blue-900/60">
-                TOTAL APPLIED NOMINATIONS
-              </span>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600">
-                <ClipboardList size={20} />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+                <Building2 size={20} />
               </div>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
@@ -509,7 +492,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-blue-900/60 font-medium">
-              <span>Used {endorsedCatCount} of {MAX_CATEGORIES_PER_UNIT} Quota</span>
+              <span>Used {endorsedCatCount} of {maxHodQuota} Quota</span>
               <span className={`font-semibold ${remainingEndorsements > 0 ? "text-emerald-600" : "text-slate-500"}`}>
                 {remainingEndorsements > 0 ? "Quota Available" : "Completed"}
               </span>
@@ -752,15 +735,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span>HOD Quota:</span>
                     {st.isFullQuota ? (
                       <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
-                        <CheckCircle2 size={12} /> Quota Filled ({st.endorsedCount}/{MAX_CATEGORIES_PER_UNIT})
+                        <CheckCircle2 size={12} /> Quota Filled ({st.endorsedCount}/{st.maxQuota})
                       </span>
                     ) : st.endorsedCount > 0 ? (
                       <span className="font-semibold text-sky-700">
-                        Partial ({st.endorsedCount}/{MAX_CATEGORIES_PER_UNIT})
+                        Partial ({st.endorsedCount}/{st.maxQuota})
                       </span>
                     ) : (
                       <span className="text-amber-700 font-semibold">
-                        0/{MAX_CATEGORIES_PER_UNIT} Endorsed
+                        0/{st.maxQuota} Endorsed
                       </span>
                     )}
                   </div>

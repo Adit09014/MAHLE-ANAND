@@ -87,7 +87,7 @@ export interface Branding {
   logoUrl: string;
 }
 
-export type Role = "employee" | "hod" | "judge" | "hr";
+export type Role = "employee" | "hod" | "judge" | "hr" | "admin";
 
 export interface AuthUser {
   role: Role;
@@ -96,7 +96,9 @@ export interface AuthUser {
   unitId?: string;
   designation?: string;
   judgeId?: string;
+  isHOD?: boolean;
   isPanelJudge?: boolean;
+  isAdmin?: boolean;
   gender?: string;
 }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import getPool, { sql } from "@/lib/mssql";
-import { AuthUser, Cycle } from "@/lib/types";
+import { AuthUser, Cycle, Role } from "@/lib/types";
 import { verifyPassword } from "@/lib/auth-utils";
 
 const TABLE = process.env.MSSQL_TABLE || "dbo.Employees";
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
         ISNULL(r.Role, 'employee')  AS Role,
         ISNULL(r.IsHOD, 0)         AS IsHOD,
         ISNULL(r.IsPanelJudge, 0)  AS IsPanelJudge,
+        ISNULL(r.IsAdmin, 0)       AS IsAdmin,
         ISNULL(r.Gender, '')       AS Gender,
         p.PasswordHash
       FROM ${TABLE} e
@@ -53,12 +54,14 @@ export async function POST(request: Request) {
     const row = result.recordset[0];
     const empName = String(row.DisplayName || "").trim();
     const dbRole = String(row.Role || "employee");
-    // IsHOD=1 overrides role to 'hod' regardless of the Role column
-    const empRole = Boolean(row.IsHOD) ? "hod" : dbRole;
+    const isHOD = Boolean(row.IsHOD);
+    const isAdmin = Boolean(row.IsAdmin);
     const storedHash: string | undefined = row.PasswordHash ?? undefined;
 
     // 2. Validate role & password
-    if (role === "hr" && empRole !== "hr") {
+    // Allow HR/Admin portal login if dbRole is 'hr'/'admin' OR user has isAdmin=1
+    const hasAdminRights = dbRole === "hr" || dbRole === "admin" || isAdmin;
+    if (role === "hr" && !hasAdminRights) {
       const isValidPassword =
         password === (process.env.HR_MASTER_PASSWORD || "") ||
         verifyPassword(password, storedHash, empCode, empName);
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
       assignedJudgeSlot = found ? found.id : empCode;
     }
 
-    const userRole = empRole === "hr" ? "hr" : empRole === "hod" ? "hod" : "employee";
+    const userRole: Role = isAdmin || dbRole === "admin" ? "admin" : dbRole === "hr" ? "hr" : isHOD || dbRole === "hod" ? "hod" : "employee";
 
     const verifiedUser: AuthUser = {
       role: userRole,
@@ -118,9 +121,10 @@ export async function POST(request: Request) {
       unitId: String(row.Department || "").trim(),
       designation:
         String(row.Designation || "").trim() ||
-        (userRole === "hr" ? "HR Admin" : userRole === "hod" ? "Department Head" : "Staff Member"),
+        (userRole === "admin" ? "System Admin" : userRole === "hr" ? "HR Admin" : isHOD ? "Department Head" : "Staff Member"),
+      isHOD,
       isPanelJudge,
-      judgeId: assignedJudgeSlot,
+      isAdmin,
       gender: String(row.Gender || ""),
     };
 

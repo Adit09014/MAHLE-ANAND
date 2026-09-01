@@ -51,6 +51,7 @@ BEGIN
         Role            NVARCHAR(20)    NOT NULL DEFAULT 'employee',
         IsHOD           BIT             NOT NULL DEFAULT 0,
         IsPanelJudge    BIT             NOT NULL DEFAULT 0,
+        IsAdmin         BIT             NOT NULL DEFAULT 0,
         Gender          NVARCHAR(10)    NULL,
         UpdatedAt       DATETIME2       NOT NULL DEFAULT GETDATE(),
         CONSTRAINT PK_EmpRoles PRIMARY KEY (Emp_No),
@@ -69,6 +70,15 @@ BEGIN
     BEGIN
         ALTER TABLE dbo.EmpRoles ADD IsHOD BIT NOT NULL DEFAULT 0;
         PRINT 'Added column IsHOD to existing dbo.EmpRoles';
+    END
+
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'EmpRoles' AND COLUMN_NAME = 'IsAdmin'
+    )
+    BEGIN
+        ALTER TABLE dbo.EmpRoles ADD IsAdmin BIT NOT NULL DEFAULT 0;
+        PRINT 'Added column IsAdmin to existing dbo.EmpRoles';
     END
 END
 GO

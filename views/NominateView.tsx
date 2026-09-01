@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Lock, Clock, Calendar, CheckCircle2, ShieldAlert, Sparkles, FileText, Check } from "lucide-react";
+import { Lock, Clock, Calendar, CheckCircle2, ShieldAlert, FileText, Check, Edit3, X } from "lucide-react";
 import { UNITS, CATEGORIES, catById, unitById } from "../lib/constants";
 import { AuthUser, Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
@@ -60,6 +60,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
     mafsValue: "1 Safety First",
   });
 
+  const [editingNomId, setEditingNomId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ bad: boolean; text: string } | null>(null);
 
   // Sync profile data when currentUser updates
@@ -114,6 +115,26 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
     }
   };
 
+  const handleStartEdit = (nom: Nomination) => {
+    setEditingNomId(nom.id);
+    setF((prev) => ({
+      ...prev,
+      category: nom.category,
+      gender: nom.gender || "",
+      citation: nom.citation || "",
+      businessImpact: nom.businessImpact || "",
+      mafsValue: nom.mafsValue || "1 Safety First",
+    }));
+    setMsg(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNomId(null);
+    setF((prev) => ({ ...prev, citation: "", businessImpact: "" }));
+    setMsg(null);
+  };
+
   const submit = () => {
     const code = (f.code || currentUser?.code || "").trim().toUpperCase();
     const name = (f.name || currentUser?.name || "").trim();
@@ -122,7 +143,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
     if (!name || !code)
       return setMsg({ bad: true, text: "Your employee profile details could not be found." });
 
-    if (!f.citation.trim() || citationWords < 5)
+    if (!f.citation.trim())
       return setMsg({
         bad: true,
         text: "Please write details for 'Projects Undertaken / Key Contribution'.",
@@ -134,7 +155,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
         text: "Projects Undertaken / Key Contribution exceeds the 500-word limit.",
       });
 
-    if (!f.businessImpact.trim() || impactWords < 3)
+    if (!f.businessImpact.trim())
       return setMsg({
         bad: true,
         text: "Please write details for 'Business Impact'.",
@@ -152,32 +173,58 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
         text: "Employee of the Month is declared for a male and female winner — please select gender.",
       });
 
-    // One self-nomination allowed per category per employee
-    if (userNominations.some((n) => n.category === f.category))
-      return setMsg({
-        bad: true,
-        text: `You have already filed a nomination under '${cat?.name}' for this month. You may nominate yourself in other categories.`,
+    if (!editingNomId) {
+      // Check duplicate category ONLY when creating a new nomination
+      if (userNominations.some((n) => n.category === f.category))
+        return setMsg({
+          bad: true,
+          text: `You have already filed a nomination under '${cat?.name}' for this month. You may edit your existing entry or nominate yourself in other categories.`,
+        });
+    }
+
+    if (editingNomId) {
+      // Update existing nomination
+      const nextNoms = cycle.nominations.map((n) => {
+        if (n.id === editingNomId) {
+          return {
+            ...n,
+            category: f.category,
+            gender: cat?.splitByGender ? f.gender : "",
+            citation: f.citation.trim(),
+            businessImpact: f.businessImpact.trim(),
+            mafsValue: f.mafsValue,
+            submittedAt: new Date().toISOString(),
+          };
+        }
+        return n;
       });
 
-    const nom: Nomination = {
-      id: `${code}-${f.category}-${Date.now()}`,
-      name,
-      code,
-      unit,
-      category: f.category,
-      gender: cat?.splitByGender ? f.gender : "",
-      citation: f.citation.trim(),
-      businessImpact: f.businessImpact.trim(),
-      mafsValue: f.mafsValue,
-      evidence: "",
-      submittedAt: new Date().toISOString(),
-      validated: null,
-      hrNote: "",
-    };
+      commit({ ...cycle, nominations: nextNoms });
+      setEditingNomId(null);
+      setF((prev) => ({ ...prev, citation: "", businessImpact: "" }));
+      setMsg({ bad: false, text: `Self-nomination under ${cat?.name} updated successfully!` });
+    } else {
+      // Create new nomination
+      const nom: Nomination = {
+        id: `${code}-${f.category}-${Date.now()}`,
+        name,
+        code,
+        unit,
+        category: f.category,
+        gender: cat?.splitByGender ? f.gender : "",
+        citation: f.citation.trim(),
+        businessImpact: f.businessImpact.trim(),
+        mafsValue: f.mafsValue,
+        evidence: "",
+        submittedAt: new Date().toISOString(),
+        validated: null,
+        hrNote: "",
+      };
 
-    commit({ ...cycle, nominations: [...cycle.nominations, nom] });
-    setF((prev) => ({ ...prev, citation: "", businessImpact: "" }));
-    setMsg({ bad: false, text: `Self-nomination successfully filed under ${cat?.name}.` });
+      commit({ ...cycle, nominations: [...cycle.nominations, nom] });
+      setF((prev) => ({ ...prev, citation: "", businessImpact: "" }));
+      setMsg({ bad: false, text: `Self-nomination successfully filed under ${cat?.name}.` });
+    }
   };
 
   return (
@@ -186,11 +233,18 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
       <Card className="p-6 border border-blue-900/10 shadow-xs bg-white">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/10 pb-4">
           <div>
-            <h2 className="text-base font-bold tracking-tight text-blue-950">
-              Self-Nomination Form
+            <h2 className="text-base font-bold tracking-tight text-blue-950 flex items-center gap-2">
+              {editingNomId ? "Edit Self-Nomination" : "Self-Nomination Form"}
+              {editingNomId && (
+                <span className="rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                  Editing Existing Entry
+                </span>
+              )}
             </h2>
             <p className="mt-0.5 text-xs text-blue-900/60">
-              Auto-filled profile details. You can nominate yourself across multiple categories.
+              {editingNomId
+                ? "Modify your submitted citation and business impact details below."
+                : "Auto-filled profile details. You can nominate yourself across multiple categories."}
             </p>
           </div>
           {nomPhase.isExtended && (
@@ -199,6 +253,23 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
             </span>
           )}
         </div>
+
+        {/* Editing active notification banner */}
+        {editingNomId && (
+          <div className="mt-4 flex items-center justify-between gap-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-950 font-medium">
+            <div className="flex items-center gap-2">
+              <Edit3 size={15} className="text-amber-700 shrink-0" />
+              <span>You are currently editing your nomination for <strong>{cat?.name}</strong>.</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              className="inline-flex items-center gap-1 rounded-lg bg-amber-200/60 hover:bg-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-900"
+            >
+              <X size={13} /> Cancel Edit
+            </button>
+          </div>
+        )}
 
         {/* Timeline Information Banner */}
         <div className="mt-4 flex items-center gap-2 rounded-xl bg-blue-900/5 border border-blue-900/10 px-3.5 py-2.5 text-xs text-blue-950 font-medium">
@@ -252,7 +323,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
             <select
               className={inputCls}
               value={f.category}
-              disabled={!open}
+              disabled={!open || Boolean(editingNomId)}
               onChange={(e) => set("category", e.target.value)}
             >
               {CATEGORIES.map((c) => (
@@ -363,10 +434,19 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
           </div>
         )}
 
-        <div className="mt-5">
+        <div className="mt-5 flex items-center gap-3">
           <Button onClick={submit} disabled={!open}>
-            Submit Self-Nomination
+            {editingNomId ? "Save & Update Citation" : "Submit Self-Nomination"}
           </Button>
+          {editingNomId && (
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel Edit
+            </button>
+          )}
         </div>
       </Card>
 
@@ -403,10 +483,15 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
               .reverse()
               .map((n) => {
                 const isEndorsed = cycle.endorsed[n.unit]?.[n.category] === n.id;
+                const isBeingEdited = editingNomId === n.id;
                 return (
                   <div
                     key={n.id}
-                    className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 space-y-3 hover:border-slate-300 transition"
+                    className={`rounded-2xl border p-4 space-y-3 transition ${
+                      isBeingEdited
+                        ? "border-amber-300 bg-amber-50/50 shadow-xs"
+                        : "border-slate-200/80 bg-slate-50/50 hover:border-slate-300"
+                    }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
                       <div className="flex items-center gap-2">
@@ -417,7 +502,18 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
                           {n.name}
                         </h4>
                       </div>
-                      <div>
+                      <div className="flex items-center gap-2">
+                        {open && (
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(n)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-blue-900/20"
+                            title="Edit Citation & Impact details"
+                          >
+                            <Edit3 size={12} className="text-blue-700" />
+                            <span>Edit Citation</span>
+                          </button>
+                        )}
                         {isEndorsed ? (
                           <Pill tone="good">
                             <CheckCircle2 size={11} className="inline mr-1" /> HOD Endorsed

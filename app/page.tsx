@@ -135,9 +135,10 @@ export default function RRAdmin() {
 
   // Filter permitted tabs based on user role & isPanelJudge DB boolean (RBAC)
   const isPanelJudge = Boolean(currentUser?.isPanelJudge);
+  const isHrOrAdmin = currentUser?.role === "hr" || currentUser?.role === "admin" || Boolean(currentUser?.isAdmin);
 
   const allowedRoles: TabId[] = currentUser
-    ? currentUser.role === "hr"
+    ? isHrOrAdmin
       ? isPanelJudge
         ? ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
         : ["dashboard", "employee", "hod", "results", "hr", "settings"]
@@ -307,7 +308,7 @@ export default function RRAdmin() {
             )}
 
             {/* Month Selector & Refresh Controls */}
-            {currentUser?.role === "hr" ? (
+            {isHrOrAdmin ? (
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 hidden sm:inline-block">
                   Admin Month:
@@ -379,7 +380,7 @@ export default function RRAdmin() {
                 <DashboardView
                   cycle={cycle}
                   points={points}
-                  currentUser={currentUser}
+                  currentUser={currentUser || undefined}
                   onNavigateToNominate={() => setRole("employee")}
                   onNavigateToEndorse={() => setRole("hod")}
                   onNavigateToJudge={() => setRole("judge")}

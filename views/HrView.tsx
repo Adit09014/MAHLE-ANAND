@@ -66,9 +66,10 @@ export interface EmployeeRecord {
   code: string;
   name: string;
   unitId: string;
-  role: "employee" | "hod" | "hr";
+  role: "employee" | "hod" | "hr" | "admin";
   isHOD?: boolean;
   isPanelJudge?: boolean;
+  isAdmin?: boolean;
   gender?: string;
   designation?: string;
   email?: string;
@@ -108,9 +109,10 @@ export const HrView: React.FC<HrViewProps> = ({
   const [editingEmp, setEditingEmp] = useState<EmployeeRecord | null>(null);
   const [editName, setEditName] = useState("");
   const [editUnitId, setEditUnitId] = useState("p1");
-  const [editRole, setEditRole] = useState<"employee" | "hod" | "hr">("employee");
+  const [editRole, setEditRole] = useState<"employee" | "hod" | "hr" | "admin">("employee");
   const [editIsPanelJudge, setEditIsPanelJudge] = useState(false);
   const [editIsHOD, setEditIsHOD] = useState(false);
+  const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editGender, setEditGender] = useState("");
   const [editNewPassword, setEditNewPassword] = useState("");
   const [editResetDefault, setEditResetDefault] = useState(false);
@@ -122,8 +124,9 @@ export const HrView: React.FC<HrViewProps> = ({
   const [addCode, setAddCode] = useState("");
   const [addName, setAddName] = useState("");
   const [addUnitId, setAddUnitId] = useState("p1");
-  const [addRole, setAddRole] = useState<"employee" | "hod" | "hr">("employee");
+  const [addRole, setAddRole] = useState<"employee" | "hod" | "hr" | "admin">("employee");
   const [addIsPanelJudge, setAddIsPanelJudge] = useState(false);
+  const [addIsAdmin, setAddIsAdmin] = useState(false);
   const [addGender, setAddGender] = useState("");
   const [addSaving, setAddSaving] = useState(false);
   const [addMsg, setAddMsg] = useState<{ type: "success" | "error"; msg: string } | null>(null);
@@ -209,7 +212,9 @@ export const HrView: React.FC<HrViewProps> = ({
 
   // Stage & Winner Password Verification Modal States
   const [stageAuthAction, setStageAuthAction] = useState<
-    { type: "change_stage"; targetStage: string; title: string } | { type: "announce_winner"; title: string } | null
+    | { type: "change_stage"; targetStage: string; title: string; warning?: string | null }
+    | { type: "announce_winner"; title: string; warning?: string | null }
+    | null
   >(null);
   const [stageAuthPassword, setStageAuthPassword] = useState("");
   const [stageAuthError, setStageAuthError] = useState<string | null>(null);
@@ -222,33 +227,40 @@ export const HrView: React.FC<HrViewProps> = ({
   const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
 
   const handleStageChangeClick = (targetStage: string) => {
-    const isRevertingFromJudging = cycle.stage === "judging" && (targetStage === "nomination" || targetStage === "validation");
-    if (targetStage === "judging" || targetStage === "nomination" || isRevertingFromJudging) {
-      let title = "Change Cycle Stage";
-      if (targetStage === "judging") {
-        title = "Change Cycle Stage to Panel Scoring";
-      } else if (targetStage === "nomination") {
-        title = "Revert Cycle Stage to Nominations";
-      } else if (targetStage === "validation") {
-        title = "Revert Cycle Stage to HR Validation";
-      }
+    if (targetStage === cycle.stage) return;
 
-      setStageAuthAction({
-        type: "change_stage",
-        targetStage,
-        title,
-      });
-      setStageAuthPassword("");
-      setStageAuthError(null);
-    } else {
-      commit({ ...cycle, stage: targetStage });
+    let title = "Change Cycle Stage";
+    let warning: string | null = null;
+
+    if (targetStage === "validation") {
+      title = "Advance Cycle Stage to HR Validation";
+      warning = "Advancing to HR Validation will close the self-nomination submission window. Employees will no longer be able to submit new self-nominations or edit their citations for this cycle.";
+    } else if (targetStage === "judging") {
+      title = "Open Panel Scoring Stage";
+      warning = "Opening Panel Scoring will lock HR validation & HOD endorsements. Panel judges will be able to log in and score endorsed nominations.";
+    } else if (targetStage === "nomination") {
+      title = "Revert Cycle Stage to Nominations";
+      warning = "Reverting to Nominations will re-open self-nomination submissions for employees and allow editing citations.";
+    } else if (targetStage === "announced") {
+      title = "Declare Winners & Publish Results";
+      warning = "Declaring winners will finalize the award cycle and publish public leaderboard results.";
     }
+
+    setStageAuthAction({
+      type: "change_stage",
+      targetStage,
+      title,
+      warning,
+    });
+    setStageAuthPassword("");
+    setStageAuthError(null);
   };
 
   const handleAnnounceClick = () => {
     setStageAuthAction({
       type: "announce_winner",
       title: "Declare Winners & Publish Results",
+      warning: "Declaring winners will finalize the award cycle and publish public leaderboard results.",
     });
     setStageAuthPassword("");
     setStageAuthError(null);
@@ -296,9 +308,10 @@ export const HrView: React.FC<HrViewProps> = ({
     setEditingEmp(emp);
     setEditName(emp.name);
     setEditUnitId(emp.unitId);
-    setEditRole(emp.role || "employee");
+    setEditRole((emp.role as "employee" | "hod" | "hr" | "admin") || "employee");
     setEditIsPanelJudge(Boolean(emp.isPanelJudge));
     setEditIsHOD(Boolean(emp.isHOD));
+    setEditIsAdmin(Boolean(emp.isAdmin) || emp.role === "admin");
     setEditGender(emp.gender || "");
     setEditNewPassword("");
     setEditResetDefault(false);
@@ -337,9 +350,10 @@ export const HrView: React.FC<HrViewProps> = ({
           code: editingEmp.code,
           name: editName,
           unitId: editUnitId,
-          role: editIsHOD ? "hod" : editRole,
+          role: editIsAdmin ? "admin" : editRole,
           isHOD: editIsHOD,
           isPanelJudge: editIsPanelJudge,
+          isAdmin: editIsAdmin,
           gender: editGender,
           newPassword: editNewPassword.trim() ? editNewPassword.trim() : undefined,
           resetPassword: editResetDefault,
@@ -382,8 +396,9 @@ export const HrView: React.FC<HrViewProps> = ({
           code: addCode.trim().toUpperCase(),
           name: addName.trim(),
           unitId: addUnitId,
-          role: addRole,
+          role: addIsAdmin ? "admin" : addRole,
           isPanelJudge: addIsPanelJudge,
+          isAdmin: addIsAdmin,
           gender: addGender,
         }),
       });
@@ -1477,6 +1492,13 @@ export const HrView: React.FC<HrViewProps> = ({
               </button>
             </div>
 
+            {stageAuthAction.warning && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 font-medium leading-relaxed">
+                <AlertTriangle size={17} className="text-amber-600 shrink-0 mt-0.5" />
+                <span>{stageAuthAction.warning}</span>
+              </div>
+            )}
+
             <p className="text-xs text-blue-900/70 leading-relaxed">
               This action alters live cycle stage visibility. Enter your <strong>Admin Password</strong> to authorize:
             </p>
@@ -1591,27 +1613,43 @@ export const HrView: React.FC<HrViewProps> = ({
                   <Label>System Role</Label>
                   <select
                     value={addRole}
-                    onChange={(e) => setAddRole(e.target.value as "employee" | "hod" | "hr")}
+                    onChange={(e) => setAddRole(e.target.value as "employee" | "hod" | "hr" | "admin")}
                     className={inputCls}
                   >
                     <option value="employee">Employee</option>
                     <option value="hod">HOD (Department Head)</option>
                     <option value="hr">HR Admin</option>
+                    <option value="admin">System Admin</option>
                   </select>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="addIsPanelJudge"
-                  checked={addIsPanelJudge}
-                  onChange={(e) => setAddIsPanelJudge(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-800 focus:ring-blue-700"
-                />
-                <label htmlFor="addIsPanelJudge" className="text-xs font-semibold text-blue-950">
-                  Appoint as Panel Judge (`isPanelJudge: true`)
-                </label>
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="addIsAdmin"
+                    checked={addIsAdmin}
+                    onChange={(e) => setAddIsAdmin(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-600"
+                  />
+                  <label htmlFor="addIsAdmin" className="text-xs font-semibold text-blue-950">
+                    Appoint as System Admin (`isAdmin: true`)
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="addIsPanelJudge"
+                    checked={addIsPanelJudge}
+                    onChange={(e) => setAddIsPanelJudge(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-800 focus:ring-blue-700"
+                  />
+                  <label htmlFor="addIsPanelJudge" className="text-xs font-semibold text-blue-950">
+                    Appoint as Panel Judge (`isPanelJudge: true`)
+                  </label>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -1695,31 +1733,44 @@ export const HrView: React.FC<HrViewProps> = ({
                   <Label>System Role</Label>
                   <select
                     value={editRole}
-                    onChange={(e) => setEditRole(e.target.value as "employee" | "hod" | "hr")}
-                    disabled={editIsHOD}
-                    className={`${inputCls} ${editIsHOD ? "opacity-50 cursor-not-allowed" : ""}`}
+                    onChange={(e) => setEditRole(e.target.value as "employee" | "hod" | "hr" | "admin")}
+                    className={inputCls}
                   >
                     <option value="employee">Employee</option>
                     <option value="hod">HOD (Department Head)</option>
                     <option value="hr">HR Admin</option>
+                    <option value="admin">System Admin</option>
                   </select>
-                  {editIsHOD && (
-                    <p className="mt-1 text-[10px] text-blue-600 font-medium">Role auto-set to HOD when IsHOD is enabled.</p>
-                  )}
                 </div>
                 <div>
                   <Label>Change Password</Label>
                   <input
                     type="password"
-                    placeholder="New password (optional)"
+                    placeholder={editResetDefault ? "Will reset to default password" : "New password (optional)"}
+                    disabled={editResetDefault}
                     value={editNewPassword}
                     onChange={(e) => setEditNewPassword(e.target.value)}
-                    className={inputCls}
+                    className={`${inputCls} ${editResetDefault ? "bg-slate-100 opacity-60 cursor-not-allowed" : ""}`}
                   />
+                  <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50/70 p-2">
+                    <input
+                      type="checkbox"
+                      id="editResetDefault"
+                      checked={editResetDefault}
+                      onChange={(e) => {
+                        setEditResetDefault(e.target.checked);
+                        if (e.target.checked) setEditNewPassword("");
+                      }}
+                      className="h-3.5 w-3.5 rounded border-amber-400 text-amber-700 focus:ring-amber-600 cursor-pointer"
+                    />
+                    <label htmlFor="editResetDefault" className="text-[11px] font-medium text-amber-950 cursor-pointer">
+                      Reset password to default (<strong>{editingEmp ? `${editingEmp.code.trim().length >= 4 ? editingEmp.code.trim().slice(-4) : editingEmp.code.trim()}${(editName || editingEmp.name).replace(/[^a-zA-Z]/g, "").slice(0, 4)}` : ""}</strong>)
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              {/* IsHOD & Panel Judge Toggles */}
+              {/* IsHOD & Panel Judge & Admin Toggles */}
               <div className="rounded-xl border border-blue-900/10 bg-blue-900/3 p-3 space-y-2">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-blue-900/50 mb-1">Access Flags</p>
                 <div className="flex items-center gap-2">
@@ -1727,15 +1778,26 @@ export const HrView: React.FC<HrViewProps> = ({
                     type="checkbox"
                     id="editIsHOD"
                     checked={editIsHOD}
-                    onChange={(e) => {
-                      setEditIsHOD(e.target.checked);
-                      if (e.target.checked) setEditRole("hod");
-                    }}
+                    onChange={(e) => setEditIsHOD(e.target.checked)}
                     className="h-4 w-4 rounded border-slate-300 text-blue-800 focus:ring-blue-700"
                   />
                   <label htmlFor="editIsHOD" className="text-xs font-semibold text-blue-950">
                     Mark as HOD (Head of Department)
                     <span className="ml-1 font-normal text-blue-900/50">— grants HOD endorsement access</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="editIsAdmin"
+                    checked={editIsAdmin}
+                    onChange={(e) => setEditIsAdmin(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-purple-700 focus:ring-purple-600"
+                  />
+                  <label htmlFor="editIsAdmin" className="text-xs font-semibold text-blue-950">
+                    Appoint as System Admin (`isAdmin: true`)
+                    <span className="ml-1 font-normal text-blue-900/50">— grants full system admin privileges</span>
                   </label>
                 </div>
 

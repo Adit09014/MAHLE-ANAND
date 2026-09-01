@@ -43,6 +43,7 @@ export async function GET(request: Request) {
         ISNULL(r.Role, 'employee')   AS Role,
         ISNULL(r.IsHOD, 0)          AS IsHOD,
         ISNULL(r.IsPanelJudge, 0)   AS IsPanelJudge,
+        ISNULL(r.IsAdmin, 0)        AS IsAdmin,
         ISNULL(r.Gender, '')        AS Gender
       FROM ${TABLE} e
       LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
@@ -71,15 +72,15 @@ export async function GET(request: Request) {
 
     const employees = result.recordset.map((row) => {
       const isHod = Boolean(row.IsHOD);
-      // IsHOD=1 always resolves to 'hod' role regardless of Role column
-      const resolvedRole = isHod
-        ? "hod"
-        : String(row.Role || "employee");
+      const isAdmin = Boolean(row.IsAdmin);
+      const storedRole = String(row.Role || "employee");
+      const resolvedRole = isAdmin ? "admin" : storedRole;
       return {
         ...mapSsmsRow(row),
         role: resolvedRole,
         isHOD: isHod,
         isPanelJudge: Boolean(row.IsPanelJudge),
+        isAdmin: isAdmin,
         gender: String(row.Gender || ""),
       };
     });
@@ -101,81 +102,77 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { code, role, isPanelJudge, isHOD, unitId, gender } = body;
+    const { code, name, role, isPanelJudge, isHOD, isAdmin, unitId, gender } = body;
 
-    if (!code) {
+    if (!code || !String(code).trim()) {
       return NextResponse.json({ error: "Employee code is required." }, { status: 400 });
     }
 
-    const empCode = code.trim().toUpperCase();
+    const empCode = String(code).trim().toUpperCase();
+    const empName = String(name || "").trim() || `Employee ${empCode}`;
     const pool = await getPool();
 
-    // Verify the employee exists in dbo.Employees
-    const checkReq = pool.request();
-    checkReq.input("emp_no", sql.NVarChar, empCode);
-    const check = await checkReq.query(
-      `SELECT Emp_No, Department FROM ${TABLE} WHERE Emp_No = @emp_no`
-    );
+    const isSettingHOD = Boolean(isHOD);
+    const isSettingAdmin = Boolean(isAdmin) || role === "admin";
+    const resolvedRole = role || (isSettingAdmin ? "admin" : isSettingHOD ? "hod" : "employee");
+    const designation = isSettingAdmin ? "System Admin" : role === "hr" ? "HR Admin" : isSettingHOD ? "Department Head" : "Staff Member";
 
-    if (!check.recordset.length) {
-      return NextResponse.json(
-        { error: `Employee '${empCode}' not found in SQL Server directory.` },
-        { status: 404 }
-      );
-    }
+    // 1. Upsert into dbo.Employees (creates employee record if new, or updates details if exists)
+    const empUpsertReq = pool.request();
+    empUpsertReq.input("emp_no", sql.NVarChar, empCode);
+    empUpsertReq.input("displayName", sql.NVarChar, empName);
+    empUpsertReq.input("department", sql.NVarChar, unitId || "hr");
+    empUpsertReq.input("designation", sql.NVarChar, designation);
 
-    // Update Department if provided
-    if (unitId) {
-      const updateDeptReq = pool.request();
-      updateDeptReq.input("emp_no", sql.NVarChar, empCode);
-      updateDeptReq.input("department", sql.NVarChar, unitId);
-      await updateDeptReq.query(`UPDATE ${TABLE} SET Department = @department WHERE Emp_No = @emp_no`);
-    }
+    await empUpsertReq.query(`
+      MERGE ${TABLE} AS target
+      USING (VALUES (@emp_no, @displayName, @department, @designation)) AS source (Emp_No, DisplayName, Department, Designation)
+      ON target.Emp_No = source.Emp_No
+      WHEN MATCHED THEN
+        UPDATE SET DisplayName = source.DisplayName, Department = source.Department, Designation = source.Designation
+      WHEN NOT MATCHED THEN
+        INSERT (Emp_No, DisplayName, Department, Designation) VALUES (source.Emp_No, source.DisplayName, source.Department, source.Designation);
+    `);
 
-    const isSettingHOD = Boolean(isHOD) || role === "hod";
-    const resolvedRole = isSettingHOD ? "hod" : (role || "employee");
-
-    // Single HOD Per Department Enforcement
+    // 2. Single HOD Per Department Enforcement (clears IsHOD flag for others in dept)
     if (isSettingHOD) {
-      const targetDept = unitId || check.recordset[0]?.Department;
-      if (targetDept) {
-        const clearHodReq = pool.request();
-        clearHodReq.input("department", sql.NVarChar, targetDept);
-        clearHodReq.input("emp_no", sql.NVarChar, empCode);
-        await clearHodReq.query(`
-          UPDATE r
-          SET r.IsHOD = 0,
-              r.Role = CASE WHEN r.Role = 'hod' THEN 'employee' ELSE r.Role END,
-              r.UpdatedAt = GETDATE()
-          FROM dbo.EmpRoles r
-          INNER JOIN ${TABLE} e ON r.Emp_No = e.Emp_No
-          WHERE e.Department = @department AND e.Emp_No <> @emp_no
-        `);
-      }
+      const targetDept = unitId || "hr";
+      const clearHodReq = pool.request();
+      clearHodReq.input("department", sql.NVarChar, targetDept);
+      clearHodReq.input("emp_no", sql.NVarChar, empCode);
+      await clearHodReq.query(`
+        UPDATE r
+        SET r.IsHOD = 0,
+            r.UpdatedAt = GETDATE()
+        FROM dbo.EmpRoles r
+        INNER JOIN ${TABLE} e ON r.Emp_No = e.Emp_No
+        WHERE e.Department = @department AND e.Emp_No <> @emp_no
+      `);
     }
 
-    // MERGE into dbo.EmpRoles (upsert)
+    // 3. MERGE into dbo.EmpRoles (upsert)
     const upsertReq = pool.request();
     upsertReq.input("emp_no", sql.NVarChar, empCode);
     upsertReq.input("role", sql.NVarChar, resolvedRole);
     upsertReq.input("isHOD", sql.Bit, isSettingHOD ? 1 : 0);
     upsertReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
+    upsertReq.input("isAdmin", sql.Bit, isSettingAdmin ? 1 : 0);
     upsertReq.input("gender", sql.NVarChar, gender || "");
 
     await upsertReq.query(`
       MERGE dbo.EmpRoles AS target
-      USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge, @gender)) AS source (Emp_No, Role, IsHOD, IsPanelJudge, Gender)
+      USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge, @isAdmin, @gender)) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin, Gender)
       ON target.Emp_No = source.Emp_No
       WHEN MATCHED THEN
-        UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, Gender = source.Gender, UpdatedAt = GETDATE()
+        UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, IsAdmin = source.IsAdmin, Gender = source.Gender, UpdatedAt = GETDATE()
       WHEN NOT MATCHED THEN
-        INSERT (Emp_No, Role, IsHOD, IsPanelJudge, Gender) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.Gender);
+        INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin, Gender) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin, source.Gender);
     `);
 
-    return NextResponse.json({ ok: true, employee: { code: empCode, role: resolvedRole, isHOD: isSettingHOD, isPanelJudge } });
+    return NextResponse.json({ ok: true, employee: { code: empCode, name: empName, role: resolvedRole, isHOD: isSettingHOD, isPanelJudge: Boolean(isPanelJudge), isAdmin: isSettingAdmin } });
   } catch (error) {
     console.error("[POST /api/employees]", error);
-    return NextResponse.json({ error: "Failed to update employee role." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create employee record." }, { status: 500 });
   }
 }
 
@@ -199,7 +196,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { code, role, isPanelJudge, isHOD, unitId, name, gender, newPassword, resetPassword, adminPassword } = body;
+    const { code, role, isPanelJudge, isHOD, isAdmin, unitId, name, gender, newPassword, resetPassword, adminPassword } = body;
 
     if (!adminPassword?.trim()) {
       return NextResponse.json(
@@ -237,29 +234,41 @@ export async function PUT(request: Request) {
       adminPassword,
       adminRow.PasswordHash ?? undefined,
       adminCode,
-      String(adminRow.DisplayName)
+      String(adminRow.DisplayName || "")
     );
 
     if (!isAdminPasswordValid) {
       return NextResponse.json(
-        { error: "Incorrect Admin Password. Authorization failed." },
+        { error: "Invalid admin confirmation password. Authorization failed." },
         { status: 401 }
       );
     }
 
-    // Verify target employee exists in SSMS
     const empCode = code.trim().toUpperCase();
-    const empReq = pool.request();
-    empReq.input("emp_no", sql.NVarChar, empCode);
-    const empResult = await empReq.query(`
-      SELECT DisplayName, Department FROM ${TABLE} WHERE Emp_No = @emp_no
-    `);
+
+    // Fetch target employee
+    const checkEmpReq = pool.request();
+    checkEmpReq.input("emp_no", sql.NVarChar, empCode);
+    const empResult = await checkEmpReq.query(
+      `SELECT e.Emp_No, e.Department, r.Role, r.IsAdmin FROM ${TABLE} e LEFT JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No WHERE e.Emp_No = @emp_no`
+    );
 
     if (!empResult.recordset.length) {
       return NextResponse.json(
-        { error: `Employee '${empCode}' not found in SQL Server directory.` },
+        { error: `Target employee '${empCode}' not found in SQL Server directory.` },
         { status: 404 }
       );
+    }
+
+    // Security check: Only Admins can set or grant isAdmin = true
+    if (isAdmin !== undefined) {
+      const isRequesterAdmin = adminUser.role === "admin" || adminUser.isAdmin;
+      if (!isRequesterAdmin && isAdmin) {
+        return NextResponse.json(
+          { error: "Only a System Admin can grant Admin privileges." },
+          { status: 403 }
+        );
+      }
     }
 
     // Update dbo.Employees fields (Department, DisplayName) if provided
@@ -280,12 +289,15 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Update dbo.EmpRoles if role/isHOD/isPanelJudge provided
-    if (role !== undefined || isHOD !== undefined || isPanelJudge !== undefined) {
-      const isSettingHOD = Boolean(isHOD) || role === "hod";
-      const resolvedRole = isSettingHOD ? "hod" : (role || "employee");
+    // Update dbo.EmpRoles if role/isHOD/isPanelJudge/isAdmin provided
+    if (role !== undefined || isHOD !== undefined || isPanelJudge !== undefined || isAdmin !== undefined) {
+      const currentRole = empResult.recordset[0]?.Role || "employee";
+      const currentIsAdmin = Boolean(empResult.recordset[0]?.IsAdmin);
+      const isSettingHOD = isHOD !== undefined ? Boolean(isHOD) : false;
+      const isSettingAdmin = isAdmin !== undefined ? Boolean(isAdmin) : (role === "admin" || currentIsAdmin);
+      const resolvedRole = role || (isSettingAdmin ? "admin" : currentRole);
 
-      // Single HOD Per Department Enforcement
+      // Single HOD Per Department Enforcement (clears IsHOD flag for others in dept)
       if (isSettingHOD) {
         const targetDept = unitId || empResult.recordset[0]?.Department;
         if (targetDept) {
@@ -295,7 +307,6 @@ export async function PUT(request: Request) {
           await clearHodReq.query(`
             UPDATE r
             SET r.IsHOD = 0,
-                r.Role = CASE WHEN r.Role = 'hod' THEN 'employee' ELSE r.Role END,
                 r.UpdatedAt = GETDATE()
             FROM dbo.EmpRoles r
             INNER JOIN ${TABLE} e ON r.Emp_No = e.Emp_No
@@ -309,16 +320,17 @@ export async function PUT(request: Request) {
       roleReq.input("role", sql.NVarChar, resolvedRole);
       roleReq.input("isHOD", sql.Bit, isSettingHOD ? 1 : 0);
       roleReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
+      roleReq.input("isAdmin", sql.Bit, isSettingAdmin ? 1 : 0);
       roleReq.input("gender", sql.NVarChar, gender || "");
 
       await roleReq.query(`
         MERGE dbo.EmpRoles AS target
-        USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge, @gender)) AS source (Emp_No, Role, IsHOD, IsPanelJudge, Gender)
+        USING (VALUES (@emp_no, @role, @isHOD, @isPanelJudge, @isAdmin, @gender)) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin, Gender)
         ON target.Emp_No = source.Emp_No
         WHEN MATCHED THEN
-          UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, Gender = source.Gender, UpdatedAt = GETDATE()
+          UPDATE SET Role = source.Role, IsHOD = source.IsHOD, IsPanelJudge = source.IsPanelJudge, IsAdmin = source.IsAdmin, Gender = source.Gender, UpdatedAt = GETDATE()
         WHEN NOT MATCHED THEN
-          INSERT (Emp_No, Role, IsHOD, IsPanelJudge, Gender) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.Gender);
+          INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin, Gender) VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin, source.Gender);
       `);
     }
 
@@ -417,7 +429,7 @@ export async function DELETE(request: Request) {
 
     const empCode = code.trim().toUpperCase();
 
-    // Remove role + password rows from SSMS (CASCADE from Employees is NOT triggered here)
+    // 1. Delete from dependent tables first (in case foreign key cascade is disabled)
     const delRoleReq = pool.request();
     delRoleReq.input("emp_no", sql.NVarChar, empCode);
     await delRoleReq.query(`DELETE FROM dbo.EmpRoles WHERE Emp_No = @emp_no`);
@@ -426,12 +438,17 @@ export async function DELETE(request: Request) {
     delPwReq.input("emp_no", sql.NVarChar, empCode);
     await delPwReq.query(`DELETE FROM dbo.EmpPasswords WHERE Emp_No = @emp_no`);
 
+    // 2. Delete from dbo.Employees master table
+    const delEmpReq = pool.request();
+    delEmpReq.input("emp_no", sql.NVarChar, empCode);
+    await delEmpReq.query(`DELETE FROM ${TABLE} WHERE Emp_No = @emp_no`);
+
     return NextResponse.json({
       ok: true,
-      message: `Employee ${empCode} app data removed. (HR record in dbo.Employees unchanged.)`,
+      message: `Employee ${empCode} deleted successfully from database.`,
     });
   } catch (error) {
     console.error("[DELETE /api/employees]", error);
-    return NextResponse.json({ error: "Failed to remove employee data." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to remove employee record." }, { status: 500 });
   }
 }
