@@ -17,9 +17,21 @@ export interface HodViewProps {
   unitId: string;
   locked: boolean;
   readOnly?: boolean;
+  month?: string;
+  setMonth?: (m: string) => void;
+  monthOptions?: { value: string; label: string }[];
 }
 
-export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked, readOnly = false }) => {
+export const HodView: React.FC<HodViewProps> = ({ 
+  cycle, 
+  commit, 
+  unitId, 
+  locked, 
+  readOnly = false,
+  month,
+  setMonth,
+  monthOptions
+}) => {
   const [allEmployees, setAllEmployees] = useState<Array<{ code: string; name: string; unitId: string }>>([]);
 
   useEffect(() => {
@@ -42,24 +54,38 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
   const mine = useMemo(() => {
     const targetUnit = (unitId || "").trim().toLowerCase();
     return (cycle.nominations || []).filter((n) => {
-      // 1. Direct match on nomination's stored unit
-      const nomUnit = (n.unit || "").trim().toLowerCase();
-      if (nomUnit && nomUnit === targetUnit) return true;
-
-      // 2. Lookup employee in live directory by code
-      const emp = allEmployees.find(
-        (e) => e.code.toUpperCase() === (n.code || "").toUpperCase()
-      );
-      if (emp && emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit) {
-        return true;
-      }
-
-      // 3. Fallback: match by employee name if code missing
-      if (emp && emp.name && n.name && emp.name.trim().toLowerCase() === n.name.trim().toLowerCase()) {
-        if (emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit) {
+      // 1. Explicitly Routed via Location / Target HOD (New System)
+      if (n.location) {
+        if (n.location === "Head Office(H.O)") {
+          // Route exclusively to the Target HOD chosen by the employee
+          if (n.targetHod) {
+            const hodEmp = allEmployees.find(e => e.code === n.targetHod);
+            if (hodEmp && hodEmp.unitId && hodEmp.unitId.trim().toLowerCase() === targetUnit) {
+              return true;
+            }
+          }
+        } else {
+          // Route exclusively to the Location HOD (e.g., PUNE, CHENNAI)
+          if (n.location.trim().toLowerCase() === targetUnit) {
+            return true;
+          }
+        }
+      } else {
+        // 2. Fallback for Legacy Nominations (Old System: Employee Department Routing)
+        const emp = allEmployees.find((e) => e.code.toUpperCase() === (n.code || "").toUpperCase());
+        if (emp && emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit) {
           return true;
         }
+        if (emp && emp.name && n.name && emp.name.trim().toLowerCase() === n.name.trim().toLowerCase()) {
+          if (emp.unitId && emp.unitId.trim().toLowerCase() === targetUnit) {
+            return true;
+          }
+        }
       }
+
+      // 3. Direct match on nomination's stored unit (Used for saved endorsements)
+      const nomUnit = (n.unit || "").trim().toLowerCase();
+      if (nomUnit && nomUnit === targetUnit) return true;
 
       // 4. Guaranteed inclusion: if this nomination is endorsed for this unit
       const matchedEndorsedKey = Object.keys(cycle.endorsed || {}).find(
@@ -82,7 +108,7 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
   const timeline = getCycleTimeline(cycle);
   const hodPhase = timeline.hodEndorsement;
   const effectiveEnd = getEffectiveEndDate(hodPhase);
-  const open = ["nomination", "validation"].includes(cycle.stage) && !locked;
+  const open = cycle.stage === "validation" && !locked;
 
   const toggle = (nom: Nomination) => {
     if (readOnly) return;
@@ -114,6 +140,27 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
             <strong>Read-Only Mode (HR Admin):</strong> You are inspecting HOD endorsements for {unit?.name || unitId}. Endorsements and withdrawals can only be performed by the designated Head of Department.
           </span>
         </div>
+      )}
+
+      {month && setMonth && monthOptions && (
+        <Card className="flex flex-col sm:flex-row gap-5 p-5 border border-blue-900/10 shadow-xs bg-white items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Select Viewing Month:
+            </span>
+            <select
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 outline-none focus:border-blue-700 shadow-xs cursor-pointer"
+            >
+              {monthOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </Card>
       )}
 
       {/* Policy Guidance Banner */}
@@ -181,9 +228,13 @@ export const HodView: React.FC<HodViewProps> = ({ cycle, commit, unitId, locked,
       </div>
 
       {!open && (
-        <div className="flex items-center gap-2 rounded border border-blue-900/15 bg-white px-3 py-2 text-xs">
-          <Lock size={13} /> Endorsement is closed — the cycle has moved to{" "}
-          {STAGES.find((s) => s.id === cycle.stage)?.label || cycle.stage}.
+        <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-950 shadow-2xs">
+          <Lock size={15} className="text-amber-800 shrink-0" />
+          <span>
+            {cycle.stage === "nomination"
+              ? "HOD Validation is currently waiting to open. Endorsements unlock once the cycle reaches HOD Validation stage (8th – 9th) after employee nominations close."
+              : `HOD Validation is closed — the cycle has moved to ${STAGES.find((s) => s.id === cycle.stage)?.label || cycle.stage}.`}
+          </span>
         </div>
       )}
 

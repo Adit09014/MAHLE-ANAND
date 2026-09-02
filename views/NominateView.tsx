@@ -46,15 +46,28 @@ export interface NominateViewProps {
   commit: (next: Cycle) => void;
   currentUser?: AuthUser | null;
   locked: boolean;
+  month: string;
+  setMonth: (m: string) => void;
+  monthOptions: { value: string; label: string }[];
 }
 
-export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, currentUser, locked }) => {
+export const NominateView: React.FC<NominateViewProps> = ({ 
+  cycle, 
+  commit, 
+  currentUser, 
+  locked,
+  month,
+  setMonth,
+  monthOptions
+}) => {
   const isHOD = Boolean(currentUser?.isHOD) || currentUser?.role === "hod";
 
   const [f, setF] = useState({
     name: currentUser?.name || "",
     code: currentUser?.code || "",
     unit: currentUser?.unitId || UNITS[0].id,
+    location: "",
+    targetHod: "",
     category: CATEGORIES[0].id,
     gender: currentUser?.gender || "",
     citation: "",
@@ -65,7 +78,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
   const [editingNomId, setEditingNomId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ bad: boolean; text: string } | null>(null);
 
-  const [allEmployees, setAllEmployees] = useState<Array<{ unitId?: string }>>([]);
+  const [allEmployees, setAllEmployees] = useState<Array<{ code: string; name: string; unitId: string; role: string; isHOD: boolean }>>([]);
 
   React.useEffect(() => {
     async function fetchEmps() {
@@ -83,6 +96,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
   }, []);
 
   const dynamicUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
+  const hodList = useMemo(() => allEmployees.filter(e => e.isHOD || e.role === "hod"), [allEmployees]);
 
   // Sync profile data when currentUser updates
   React.useEffect(() => {
@@ -158,6 +172,8 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
       gender: nom.gender || "",
       citation: nom.citation || "",
       businessImpact: nom.businessImpact || "",
+      location: nom.location || "",
+      targetHod: nom.targetHod || "",
       mafsValue: nom.mafsValue || "1 Safety First",
     }));
     setMsg(null);
@@ -166,7 +182,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
 
   const handleCancelEdit = () => {
     setEditingNomId(null);
-    setF((prev) => ({ ...prev, citation: "", businessImpact: "" }));
+    setF((prev) => ({ ...prev, citation: "", businessImpact: "", location: "", targetHod: "" }));
     setMsg(null);
   };
 
@@ -202,6 +218,18 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
         text: "Business Impact exceeds the 250-word limit.",
       });
 
+    if (!f.location)
+      return setMsg({
+        bad: true,
+        text: "Please select a Location.",
+      });
+
+    if (f.location === "Head Office(H.O)" && !f.targetHod)
+      return setMsg({
+        bad: true,
+        text: "Please select a Target HOD for Approval since you selected Head Office.",
+      });
+
     if (cat?.splitByGender && !f.gender)
       return setMsg({
         bad: true,
@@ -227,6 +255,8 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
             gender: cat?.splitByGender ? f.gender : "",
             citation: f.citation.trim(),
             businessImpact: f.businessImpact.trim(),
+            location: f.location,
+            targetHod: f.location === "Head Office(H.O)" ? f.targetHod : "",
             mafsValue: f.mafsValue,
             submittedAt: new Date().toISOString(),
           };
@@ -236,7 +266,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
 
       commit({ ...cycle, nominations: nextNoms });
       setEditingNomId(null);
-      setF((prev) => ({ ...prev, citation: "", businessImpact: "" }));
+      setF((prev) => ({ ...prev, citation: "", businessImpact: "", location: "", targetHod: "" }));
       setMsg({ bad: false, text: `Self-nomination under ${cat?.name} updated successfully!` });
     } else {
       // Create new nomination
@@ -249,6 +279,8 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
         gender: cat?.splitByGender ? f.gender : "",
         citation: f.citation.trim(),
         businessImpact: f.businessImpact.trim(),
+        location: f.location,
+        targetHod: f.location === "Head Office(H.O)" ? f.targetHod : "",
         mafsValue: f.mafsValue,
         evidence: "",
         submittedAt: new Date().toISOString(),
@@ -257,7 +289,7 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
       };
 
       commit({ ...cycle, nominations: [...cycle.nominations, nom] });
-      setF((prev) => ({ ...prev, citation: "", businessImpact: "" }));
+      setF((prev) => ({ ...prev, citation: "", businessImpact: "", location: "", targetHod: "" }));
       setMsg({ bad: false, text: `Self-nomination successfully filed under ${cat?.name}.` });
     }
   };
@@ -322,6 +354,21 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
         )}
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <Field label="Nomination Month">
+            <select
+              className={inputCls}
+              value={month}
+              disabled={Boolean(editingNomId)}
+              onChange={(e) => setMonth(e.target.value)}
+            >
+              {monthOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           {/* Profile Auto-filled locked fields */}
           <Field label="Employee Name (Auto-Filled)">
             <input
@@ -341,20 +388,39 @@ export const NominateView: React.FC<NominateViewProps> = ({ cycle, commit, curre
               title="Locked to your registered profile"
             />
           </Field>
-          <Field label="Department / Unit">
+          <Field label="Location">
             <select
               className={inputCls}
-              value={f.unit}
+              value={f.location}
               disabled={!open || Boolean(editingNomId)}
-              onChange={(e) => set("unit", e.target.value)}
+              onChange={(e) => set("location", e.target.value)}
             >
-              {dynamicUnits.map((u: { id: string; name: string }) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
+              <option value="">Select Location</option>
+              <option value="Head Office(H.O)">Head Office(H.O)</option>
+              <option value="PUNE">PUNE</option>
+              <option value="CHENNAI">CHENNAI</option>
+              <option value="KHANDSA">KHANDSA</option>
+              <option value="PARWANOO">PARWANOO</option>
             </select>
           </Field>
+          {f.location === "Head Office(H.O)" && (
+            <Field label="Target HOD for Approval">
+              <select
+                className={inputCls}
+                value={f.targetHod}
+                disabled={!open || Boolean(editingNomId)}
+                onChange={(e) => set("targetHod", e.target.value)}
+              >
+                <option value="">Select HOD</option>
+                {hodList.map((h) => (
+                  <option key={h.code} value={h.code}>
+                    {h.name} ({unitById(h.unitId)?.name || h.unitId})
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
           <Field label="Award Category">
             <select
               className={inputCls}

@@ -14,7 +14,7 @@ export function getDefaultTimeline(month: string): CycleTimeline {
       isExtended: false,
     },
     hodEndorsement: {
-      startDate: `${y}-${pad(m)}-01`,
+      startDate: `${y}-${pad(m)}-08`,
       endDate: `${y}-${pad(m)}-09`,
       isExtended: false,
     },

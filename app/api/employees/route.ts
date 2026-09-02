@@ -4,6 +4,8 @@ import getPool, { sql } from "@/lib/mssql";
 import { AuthUser } from "@/lib/types";
 import { hashPassword, verifyPassword } from "@/lib/auth-utils";
 
+export const dynamic = "force-dynamic";
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const TABLE = process.env.MSSQL_TABLE || "dbo.Employees";
@@ -200,7 +202,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { code, role, isPanelJudge, isHOD, isAdmin, unitId, name, email, location, gender, newPassword, resetPassword, adminPassword } = body;
+    const { code, newCode, role, isPanelJudge, isHOD, isAdmin, unitId, name, email, location, gender, newPassword, resetPassword, adminPassword } = body;
 
     if (!adminPassword?.trim()) {
       return NextResponse.json(
@@ -275,11 +277,18 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Update dbo.Employees fields (Department, DisplayName, Work_Email, Location) if provided
-    if (unitId || name || email !== undefined || location !== undefined) {
+    // Use targetEmpCode for all subsequent queries if the code was changed
+    const targetEmpCode = newCode ? String(newCode).trim().toUpperCase() : empCode;
+
+    // Update dbo.Employees fields (Emp_No, Department, DisplayName, Work_Email, Location) if provided
+    if (unitId || name || email !== undefined || location !== undefined || newCode) {
       const updateEmpReq = pool.request();
       updateEmpReq.input("emp_no", sql.NVarChar, empCode);
       const setClauses: string[] = [];
+      if (newCode) {
+        updateEmpReq.input("new_emp_no", sql.NVarChar, targetEmpCode);
+        setClauses.push("Emp_No = @new_emp_no");
+      }
       if (unitId) {
         updateEmpReq.input("department", sql.NVarChar, unitId);
         setClauses.push("Department = @department");
@@ -298,6 +307,57 @@ export async function PUT(request: Request) {
       }
       if (setClauses.length > 0) {
         await updateEmpReq.query(`UPDATE ${TABLE} SET ${setClauses.join(", ")} WHERE Emp_No = @emp_no`);
+      }
+
+      // If the primary key (Emp_No) was changed, we must also migrate the JSON data 
+      // in dbo.Cycles and dbo.Points to ensure nominations and points are not orphaned.
+      if (newCode && empCode !== targetEmpCode) {
+        // 1. Migrate dbo.Cycles
+        const cyclesReq = pool.request();
+        const cyclesRes = await cyclesReq.query(`SELECT Month, DataJSON FROM dbo.Cycles`);
+        for (const row of cyclesRes.recordset) {
+          let cycleChanged = false;
+          try {
+            const cycle = JSON.parse(row.DataJSON);
+            for (const nom of cycle.nominations || []) {
+              if (nom.code === empCode) { nom.code = targetEmpCode; cycleChanged = true; }
+              if (nom.endorsed?.by === empCode) { nom.endorsed.by = targetEmpCode; cycleChanged = true; }
+              if (nom.scores && nom.scores[empCode] !== undefined) {
+                nom.scores[targetEmpCode] = nom.scores[empCode];
+                delete nom.scores[empCode];
+                cycleChanged = true;
+              }
+            }
+            if (cycle.judgeProgress && cycle.judgeProgress[empCode] !== undefined) {
+              cycle.judgeProgress[targetEmpCode] = cycle.judgeProgress[empCode];
+              delete cycle.judgeProgress[empCode];
+              cycleChanged = true;
+            }
+            if (cycleChanged) {
+              const uReq = pool.request();
+              uReq.input("month", sql.NVarChar, row.Month);
+              uReq.input("data", sql.NVarChar(sql.MAX), JSON.stringify(cycle));
+              await uReq.query(`UPDATE dbo.Cycles SET DataJSON = @data, UpdatedAt = GETDATE() WHERE Month = @month`);
+            }
+          } catch (e) { /* ignore parse errors */ }
+        }
+
+        // 2. Migrate dbo.Points
+        const ptsReq = pool.request();
+        const ptsRes = await ptsReq.query(`SELECT KeyName, DataJSON FROM dbo.Points`);
+        for (const row of ptsRes.recordset) {
+          try {
+            const pts = JSON.parse(row.DataJSON);
+            if (pts[empCode] !== undefined) {
+              pts[targetEmpCode] = pts[empCode];
+              delete pts[empCode];
+              const uReq = pool.request();
+              uReq.input("key", sql.NVarChar, row.KeyName);
+              uReq.input("data", sql.NVarChar(sql.MAX), JSON.stringify(pts));
+              await uReq.query(`UPDATE dbo.Points SET DataJSON = @data, UpdatedAt = GETDATE() WHERE KeyName = @key`);
+            }
+          } catch (e) { /* ignore parse errors */ }
+        }
       }
     }
 
@@ -328,7 +388,7 @@ export async function PUT(request: Request) {
       }
 
       const roleReq = pool.request();
-      roleReq.input("emp_no", sql.NVarChar, empCode);
+      roleReq.input("emp_no", sql.NVarChar, targetEmpCode);
       roleReq.input("role", sql.NVarChar, resolvedRole);
       roleReq.input("isHOD", sql.Bit, isSettingHOD ? 1 : 0);
       roleReq.input("isPanelJudge", sql.Bit, isPanelJudge ? 1 : 0);
@@ -350,7 +410,7 @@ export async function PUT(request: Request) {
     if (newPassword?.trim()) {
       const newHash = hashPassword(newPassword.trim());
       const pwReq = pool.request();
-      pwReq.input("emp_no", sql.NVarChar, empCode);
+      pwReq.input("emp_no", sql.NVarChar, targetEmpCode);
       pwReq.input("hash", sql.NVarChar(64), newHash);
 
       await pwReq.query(`
@@ -365,7 +425,7 @@ export async function PUT(request: Request) {
     } else if (resetPassword) {
       // Delete custom hash — fallback to default formula on next login
       const delReq = pool.request();
-      delReq.input("emp_no", sql.NVarChar, empCode);
+      delReq.input("emp_no", sql.NVarChar, targetEmpCode);
       await delReq.query(`DELETE FROM dbo.EmpPasswords WHERE Emp_No = @emp_no`);
     }
 

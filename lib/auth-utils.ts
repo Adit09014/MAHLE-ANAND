@@ -2,17 +2,10 @@ import crypto from "crypto";
 
 /**
  * Generates the default plain-text password for an employee:
- * Last 4 digits/characters of Employee Code + First 4 letters of Name.
- * Example: M1003 + "Vikram Singh" => "1003Vikr"
+ * Always defaults to "Welcome@1234" for new employees.
  */
 export function generateDefaultPassword(code: string, name: string): string {
-  const cleanCode = (code || "").trim();
-  const codePart = cleanCode.length >= 4 ? cleanCode.slice(-4) : cleanCode;
-
-  const cleanName = (name || "").replace(/[^a-zA-Z]/g, "");
-  const namePart = cleanName.length >= 4 ? cleanName.slice(0, 4) : cleanName;
-
-  return `${codePart}${namePart}`;
+  return "Welcome@1234";
 }
 
 /**

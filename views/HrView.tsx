@@ -84,6 +84,9 @@ export interface HrViewProps {
   monthLabel: string;
   brand: Branding;
   setBrand: React.Dispatch<React.SetStateAction<Branding>>;
+  month?: string;
+  setMonth?: (m: string) => void;
+  monthOptions?: { value: string; label: string }[];
 }
 
 export const HrView: React.FC<HrViewProps> = ({
@@ -94,10 +97,12 @@ export const HrView: React.FC<HrViewProps> = ({
   monthLabel,
   brand,
   setBrand,
+  month,
+  setMonth,
+  monthOptions,
 }) => {
   const [logoDraft, setLogoDraft] = useState(brand.logoUrl || "");
   const [logoSaved, setLogoSaved] = useState(false);
-  const [hodsList, setHodsList] = useState<HodEmployee[]>([]);
 
   // Employee Directory & Details Management States
   const [allEmployees, setAllEmployees] = useState<EmployeeRecord[]>([]);
@@ -106,8 +111,21 @@ export const HrView: React.FC<HrViewProps> = ({
   const [empRoleFilter, setEmpRoleFilter] = useState("all");
   const [empUnitFilter, setEmpUnitFilter] = useState("all");
 
+  const hodsList = useMemo(() => {
+    const hodsOnly = allEmployees.filter((e) => e.isHOD || e.role === "hod");
+    const source = hodsOnly.length > 0 ? hodsOnly : allEmployees;
+    return source.map((e) => ({
+      code: e.code,
+      name: e.name,
+      unitId: e.unitId,
+      role: e.role,
+      isPanelJudge: e.isPanelJudge,
+    }));
+  }, [allEmployees]);
+
   // Edit Employee Modal States
   const [editingEmp, setEditingEmp] = useState<EmployeeRecord | null>(null);
+  const [editCode, setEditCode] = useState("");
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editLocation, setEditLocation] = useState("");
@@ -198,7 +216,7 @@ export const HrView: React.FC<HrViewProps> = ({
   const fetchEmployees = async () => {
     setEmpLoading(true);
     try {
-      const res = await fetch("/api/employees");
+      const res = await fetch("/api/employees?t=" + Date.now());
       if (res.ok) {
         const data = await res.json();
         setAllEmployees(data.employees || []);
@@ -237,11 +255,11 @@ export const HrView: React.FC<HrViewProps> = ({
     let warning: string | null = null;
 
     if (targetStage === "validation") {
-      title = "Advance Cycle Stage to HR Validation";
-      warning = "Advancing to HR Validation will close the self-nomination submission window. Employees will no longer be able to submit new self-nominations or edit their citations for this cycle.";
+      title = "Advance Cycle Stage to HOD Validation";
+      warning = "Advancing to HOD Validation will close the self-nomination submission window. Employees will no longer be able to submit new self-nominations, and HODs will be unlocked to review and endorse nominees.";
     } else if (targetStage === "judging") {
       title = "Open Panel Scoring Stage";
-      warning = "Opening Panel Scoring will lock HR validation & HOD endorsements. Panel judges will be able to log in and score endorsed nominations.";
+      warning = "Opening Panel Scoring will lock HOD validation & endorsements. Panel judges will be able to log in and score endorsed nominations.";
     } else if (targetStage === "nomination") {
       title = "Revert Cycle Stage to Nominations";
       warning = "Reverting to Nominations will re-open self-nomination submissions for employees and allow editing citations.";
@@ -335,6 +353,7 @@ export const HrView: React.FC<HrViewProps> = ({
 
   const openEditModal = (emp: EmployeeRecord) => {
     setEditingEmp(emp);
+    setEditCode(emp.code);
     setEditName(emp.name);
     setEditEmail(emp.email || "");
     setEditLocation(emp.location || "");
@@ -379,6 +398,7 @@ export const HrView: React.FC<HrViewProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: editingEmp.code,
+          newCode: editCode.trim().toUpperCase() !== editingEmp.code.toUpperCase() ? editCode.trim().toUpperCase() : undefined,
           name: editName,
           email: editEmail.trim(),
           location: editLocation.trim(),
@@ -527,20 +547,7 @@ export const HrView: React.FC<HrViewProps> = ({
 
   const allUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
 
-  useEffect(() => {
-    async function fetchHods() {
-      try {
-        const res = await fetch("/api/employees?role=hod");
-        if (res.ok) {
-          const data = await res.json();
-          setHodsList(data.employees || []);
-        }
-      } catch (e) {
-        /* ignore */
-      }
-    }
-    fetchHods();
-  }, []);
+
 
   const saveLogo = async () => {
     const next = { ...brand, logoUrl: logoDraft.trim() };
@@ -597,7 +604,7 @@ export const HrView: React.FC<HrViewProps> = ({
   const setJudge = async (slotId: string, empCode: string) => {
     const nextJudges = cycle.judges.map((j) => {
       if (j.id !== slotId) return j;
-      const matchHod = hodsList.find((h) => h.code === empCode);
+      const matchHod = allEmployees.find((h) => h.code === empCode);
       return {
         ...j,
         code: empCode,
@@ -844,11 +851,32 @@ export const HrView: React.FC<HrViewProps> = ({
       {/* 2. Admin Stage Controls & Metric Summary Cards */}
       <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-900/10 pb-5">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-blue-900/60 block mb-1">
-              Cycle Stage Management ({monthLabel})
-            </span>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-3">
+            {month && setMonth && monthOptions && (
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-blue-700" />
+                  Target Cycle Month:
+                </span>
+                <select
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="rounded-xl border border-blue-900/20 bg-blue-50/70 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-xs outline-none focus:border-blue-700 focus:bg-white cursor-pointer transition"
+                >
+                  {monthOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-blue-900/60 block mb-1">
+                Cycle Stage Management ({monthLabel})
+              </span>
+              <div className="flex flex-wrap gap-2">
               {STAGES.map((s) => (
                 <button
                   key={s.id}
@@ -862,6 +890,7 @@ export const HrView: React.FC<HrViewProps> = ({
                   {s.label}
                 </button>
               ))}
+              </div>
             </div>
           </div>
 
@@ -1778,6 +1807,16 @@ export const HrView: React.FC<HrViewProps> = ({
             <form onSubmit={handleSaveEmpEditClick} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label>Employee Code / ID</Label>
+                  <input
+                    type="text"
+                    required
+                    value={editCode}
+                    onChange={(e) => setEditCode(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
                   <Label>Employee Name</Label>
                   <input
                     type="text"
@@ -1787,6 +1826,30 @@ export const HrView: React.FC<HrViewProps> = ({
                     className={inputCls}
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Work Email</Label>
+                  <input
+                    type="email"
+                    placeholder="e.g. name@mahle.com"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <Label>Location / Plant</Label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Gurgaon"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Department / Unit</Label>
                   <select value={editUnitId} onChange={(e) => setEditUnitId(e.target.value)} className={inputCls}>
@@ -1866,7 +1929,7 @@ export const HrView: React.FC<HrViewProps> = ({
                 <Label>Change Password</Label>
                   <input
                     type="password"
-                    placeholder={editResetDefault ? "Will reset to default password" : "New password (optional)"}
+                    placeholder={editResetDefault ? "Will reset to default password (Welcome@1234)" : "New password (optional)"}
                     disabled={editResetDefault}
                     value={editNewPassword}
                     onChange={(e) => setEditNewPassword(e.target.value)}
@@ -1884,7 +1947,7 @@ export const HrView: React.FC<HrViewProps> = ({
                       className="h-3.5 w-3.5 rounded border-amber-400 text-amber-700 focus:ring-amber-600 cursor-pointer"
                     />
                     <label htmlFor="editResetDefault" className="text-[11px] font-medium text-amber-950 cursor-pointer">
-                      Reset password to default (<strong>{editingEmp ? `${editingEmp.code.trim().length >= 4 ? editingEmp.code.trim().slice(-4) : editingEmp.code.trim()}${(editName || editingEmp.name).replace(/[^a-zA-Z]/g, "").slice(0, 4)}` : ""}</strong>)
+                      Reset password to default (<strong>Welcome@1234</strong>)
                     </label>
                   </div>
                 </div>

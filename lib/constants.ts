@@ -1,6 +1,24 @@
 import { Unit, Category, Stage } from "./types";
 
-export const UNITS: Unit[] = [];
+export const UNITS: Unit[] = [
+  // Plants
+  { id: "PUNE", name: "PUNE", kind: "Plant" },
+  { id: "CHENNAI", name: "CHENNAI", kind: "Plant" },
+  { id: "KHANDSA", name: "KHANDSA", kind: "Plant" },
+  { id: "PARWANOO", name: "PARWANOO", kind: "Plant" },
+  
+  // Functions (HO)
+  { id: "HR", name: "HR", kind: "Function" },
+  { id: "Finance & IT", name: "Finance & IT", kind: "Function" },
+  { id: "SCM", name: "SCM", kind: "Function" },
+  { id: "Central Quality", name: "Central Quality", kind: "Function" },
+  { id: "General Management & Operations", name: "General Management & Operations", kind: "Function" },
+  { id: "Sales & Applications", name: "Sales & Applications", kind: "Function" },
+  { id: "R&D", name: "R&D", kind: "Function" },
+  { id: "Central Purchase", name: "Central Purchase", kind: "Function" },
+  { id: "After Market", name: "After Market", kind: "Function" },
+  { id: "Central Process", name: "Central Process", kind: "Function" }
+];
 
 export const CATEGORIES: Category[] = [
   {
@@ -38,7 +56,7 @@ export const CATEGORIES: Category[] = [
 
 export const STAGES: Stage[] = [
   { id: "nomination", label: "Nominations", window: "1st – 7th" },
-  { id: "validation", label: "HR validation", window: "8th – 9th" },
+  { id: "validation", label: "HOD validation", window: "8th – 9th" },
   { id: "judging", label: "Panel scoring", window: "10th – 12th" },
   { id: "announced", label: "Winners declared", window: "15th" },
 ];
@@ -54,6 +72,8 @@ export const catById = (id: string): Category | undefined =>
 
 export const unitById = (id: string): Unit => {
   if (!id) return { id: "", name: "N/A", kind: "Department" };
+  const found = UNITS.find((u) => u.id.toLowerCase() === id.toLowerCase());
+  if (found) return found;
   return {
     id: id,
     name: id, // Exact text from Database
@@ -62,25 +82,12 @@ export const unitById = (id: string): Unit => {
 };
 
 export function getDynamicUnits(allEmployees: { unitId?: string }[] = []): Unit[] {
-  const map = new Map<string, Unit>();
-
-  // Extract ONLY actual department names present in database records
-  for (const emp of allEmployees) {
-    if (!emp.unitId || !emp.unitId.trim()) continue;
-    const name = emp.unitId.trim();
-    const key = name.toLowerCase();
-    if (!map.has(key)) {
-      map.set(key, {
-        id: name,
-        name: name,
-        kind: "Department",
-      });
-    }
-  }
-
-  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  // Enforce static list instead of dynamically computing from employees
+  return UNITS;
 }
 
 export function getMaxCategoriesForUnit(unitId?: string): number {
-  return 2;
+  if (!unitId) return 2;
+  const unit = unitById(unitId);
+  return unit.kind === "Plant" ? 4 : 2;
 }

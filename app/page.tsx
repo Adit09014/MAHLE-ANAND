@@ -81,6 +81,21 @@ export default function RRAdmin() {
 
   const dynamicUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
 
+  const monthOptions = useMemo(() => {
+    const opts = [];
+    const d = new Date();
+    // 1 current + 6 future = 7 iterations. No past months.
+    for (let i = 0; i < 7; i++) {
+      const year = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const val = `${year}-${String(m).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      opts.push({ value: val, label });
+      d.setMonth(d.getMonth() + 1);
+    }
+    return opts;
+  }, []);
+
   // Load session from cookie and set RBAC role defaults
   useEffect(() => {
     async function checkAuth() {
@@ -241,20 +256,25 @@ export default function RRAdmin() {
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  // Filter permitted tabs based on user role & isPanelJudge DB boolean (RBAC)
-  const isPanelJudge = Boolean(currentUser?.isPanelJudge);
+  // Check if current user is an appointed panel judge for this cycle in real time (live)
+  const isAppointedJudgeInCycle = Boolean(
+    currentUser &&
+    cycle?.judges?.some(
+      (j) =>
+        (j.code && j.code.trim().toUpperCase() === currentUser.code?.trim().toUpperCase()) ||
+        (j.name && currentUser.name && j.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
+    )
+  );
+
+  const isPanelJudge = Boolean(currentUser?.isPanelJudge) || isAppointedJudgeInCycle;
   const isHrOrAdmin = currentUser?.role === "hr" || currentUser?.role === "admin" || Boolean(currentUser?.isAdmin);
   const isHOD = Boolean(currentUser?.isHOD) || currentUser?.role === "hod";
 
   const allowedRoles: TabId[] = currentUser
     ? isHrOrAdmin
       ? isHOD
-        ? isPanelJudge
-          ? ["dashboard", "hod", "judge", "results", "hr", "settings"]
-          : ["dashboard", "hod", "results", "hr", "settings"]
-        : isPanelJudge
-          ? ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
-          : ["dashboard", "employee", "hod", "results", "hr", "settings"]
+        ? ["dashboard", "hod", "judge", "results", "hr", "settings"]
+        : ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
       : isHOD
         ? isPanelJudge
           ? ["dashboard", "hod", "judge", "results", "settings"]
@@ -425,26 +445,7 @@ export default function RRAdmin() {
               </div>
             )}
 
-            {/* Month Selector & Refresh Controls */}
-            {isHrOrAdmin ? (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 hidden sm:inline-block">
-                  Admin Month:
-                </span>
-                <input
-                  type="month"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-950 outline-none focus:border-blue-700 shadow-xs"
-                  title="Select Active Cycle Month (Admin Access)"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-blue-950 shadow-xs">
-                <Calendar size={13} className="text-blue-800" />
-                <span>{monthLabel}</span>
-              </div>
-            )}
+            {/* Top Bar Controls */}
 
             <button
               onClick={() => refresh(month)}
@@ -511,6 +512,9 @@ export default function RRAdmin() {
                   commit={commit}
                   currentUser={currentUser}
                   locked={locked}
+                  month={month}
+                  setMonth={setMonth}
+                  monthOptions={monthOptions}
                 />
               )}
               {activeRole === "hod" && (
@@ -520,6 +524,9 @@ export default function RRAdmin() {
                   commit={commit}
                   locked={locked}
                   readOnly={currentUser?.role === "hr" || currentUser?.role === "admin"}
+                  month={month}
+                  setMonth={setMonth}
+                  monthOptions={monthOptions}
                 />
               )}
               {activeRole === "judge" && (
@@ -540,6 +547,9 @@ export default function RRAdmin() {
                   monthLabel={monthLabel}
                   brand={brand}
                   setBrand={setBrand}
+                  month={month}
+                  setMonth={setMonth}
+                  monthOptions={monthOptions}
                 />
               )}
               {activeRole === "results" && (
