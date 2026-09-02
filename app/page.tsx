@@ -267,11 +267,11 @@ export default function RRAdmin() {
   );
 
   const isPanelJudge = Boolean(currentUser?.isPanelJudge) || isAppointedJudgeInCycle;
-  const isHrOrAdmin = currentUser?.role === "hr" || currentUser?.role === "admin" || Boolean(currentUser?.isAdmin);
+  const isAdmin = Boolean(currentUser?.isAdmin) || currentUser?.role === "admin";
   const isHOD = Boolean(currentUser?.isHOD) || currentUser?.role === "hod";
 
   const allowedRoles: TabId[] = currentUser
-    ? isHrOrAdmin
+    ? isAdmin
       ? isHOD
         ? ["dashboard", "hod", "judge", "results", "hr", "settings"]
         : ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
@@ -394,10 +394,10 @@ export default function RRAdmin() {
         <header className="bg-white border-b border-slate-200/80 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-xs">
           {/* Left Side: Unit/Judge Selectors & Active Stage */}
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Unit selector for HOD or HR */}
+            {/* Unit selector for HOD or Admin */}
             {activeRole === "hod" && (
               <div className="flex items-center gap-2">
-                {isHrOrAdmin ? (
+                {isAdmin ? (
                   <select
                     value={asUnit}
                     onChange={(e) => setAsUnit(e.target.value)}
@@ -414,7 +414,7 @@ export default function RRAdmin() {
                     {asUnit}
                   </div>
                 )}
-                {!isHrOrAdmin && (
+                {!isAdmin && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
                     <Lock size={12} /> Assigned Unit
                   </span>

@@ -59,8 +59,8 @@ export async function POST(request: Request) {
     const storedHash: string | undefined = row.PasswordHash ?? undefined;
 
     // 2. Validate role & password
-    // Allow HR/Admin portal login if dbRole is 'hr'/'admin' OR user has isAdmin=1
-    const hasAdminRights = dbRole === "hr" || dbRole === "admin" || isAdmin;
+    // Allow HR/Admin portal login only if user has isAdmin=1 or dbRole is 'admin'
+    const hasAdminRights = dbRole === "admin" || isAdmin;
     if (role === "hr" && !hasAdminRights) {
       const isValidPassword =
         password === (process.env.HR_MASTER_PASSWORD || "") ||
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
       if (!isValidPassword) {
         return NextResponse.json(
-          { error: `Employee '${empCode}' does not have HR Admin privileges or password is incorrect.` },
+          { error: `Employee '${empCode}' does not have Admin privileges (IsAdmin required) or password is incorrect.` },
           { status: 401 }
         );
       }
