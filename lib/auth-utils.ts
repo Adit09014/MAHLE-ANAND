@@ -2,10 +2,10 @@ import crypto from "crypto";
 
 /**
  * Generates the default plain-text password for an employee:
- * Always defaults to "Welcome@1234" for new employees.
+ * Always defaults to "Welcome@123" for new employees.
  */
 export function generateDefaultPassword(code: string, name: string): string {
-  return "Welcome@1234";
+  return "Welcome@123";
 }
 
 /**

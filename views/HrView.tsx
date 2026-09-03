@@ -726,7 +726,7 @@ export const HrView: React.FC<HrViewProps> = ({
       [
         "Month",
         "Category",
-        "Slot",
+        "Gender",
         "Employee",
         "Code",
         "Department",
@@ -743,7 +743,7 @@ export const HrView: React.FC<HrViewProps> = ({
         rows.push([
           cycle.month,
           r.category.name,
-          r.slotLabel || "",
+          r.slotLabel || x.nom.gender || "",
           x.nom.name,
           x.nom.code,
           unitById(x.nom.unit)?.name || x.nom.unit,
@@ -1929,7 +1929,7 @@ export const HrView: React.FC<HrViewProps> = ({
                 <Label>Change Password</Label>
                   <input
                     type="password"
-                    placeholder={editResetDefault ? "Will reset to default password (Welcome@1234)" : "New password (optional)"}
+                    placeholder={editResetDefault ? "Will reset to default password (Welcome@123)" : "New password (optional)"}
                     disabled={editResetDefault}
                     value={editNewPassword}
                     onChange={(e) => setEditNewPassword(e.target.value)}
@@ -1947,7 +1947,7 @@ export const HrView: React.FC<HrViewProps> = ({
                       className="h-3.5 w-3.5 rounded border-amber-400 text-amber-700 focus:ring-amber-600 cursor-pointer"
                     />
                     <label htmlFor="editResetDefault" className="text-[11px] font-medium text-amber-950 cursor-pointer">
-                      Reset password to default (<strong>Welcome@1234</strong>)
+                      Reset password to default (<strong>Welcome@123</strong>)
                     </label>
                   </div>
                 </div>
