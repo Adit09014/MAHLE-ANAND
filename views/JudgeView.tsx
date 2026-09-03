@@ -72,7 +72,7 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
   const effectiveEnd = getEffectiveEndDate(judgePhase);
   const today = new Date().toISOString().slice(0, 10);
   const isDateActive = today >= judgePhase.startDate && today <= effectiveEnd;
-  const open = !locked && cycle.stage === "judging" && isDateActive;
+  const open = !locked && (isDateActive || cycle.stage === "judging");
 
   // Selected candidate state
   const [selectedNomId, setSelectedNomId] = useState<string>("");
@@ -339,11 +339,10 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
                       <div
                         key={n.id}
                         onClick={() => setSelectedNomId(n.id)}
-                        className={`rounded-2xl border p-3.5 cursor-pointer transition duration-150 space-y-2.5 ${
-                          isSelected
-                            ? "border-sky-500 bg-sky-50/80 ring-2 ring-sky-400/40 shadow-xs"
-                            : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50"
-                        }`}
+                        className={`rounded-2xl border p-3.5 cursor-pointer transition duration-150 space-y-2.5 ${isSelected
+                          ? "border-sky-500 bg-sky-50/80 ring-2 ring-sky-400/40 shadow-xs"
+                          : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -497,11 +496,10 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
                           type="button"
                           disabled={!open}
                           onClick={() => setScore(activeNom.id, num)}
-                          className={`h-11 rounded-xl text-sm font-extrabold transition-all duration-150 active:scale-95 shadow-2xs ${
-                            isSelected
-                              ? "bg-[#0A2540] text-white ring-2 ring-sky-400 shadow-md scale-105"
-                              : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 disabled:opacity-50"
-                          }`}
+                          className={`h-11 rounded-xl text-sm font-extrabold transition-all duration-150 active:scale-95 shadow-2xs ${isSelected
+                            ? "bg-[#0A2540] text-white ring-2 ring-sky-400 shadow-md scale-105"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 disabled:opacity-50"
+                            }`}
                         >
                           {num}
                         </button>

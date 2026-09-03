@@ -117,7 +117,7 @@ export const HodView: React.FC<HodViewProps> = ({
   const effectiveEnd = getEffectiveEndDate(hodPhase);
   const today = new Date().toISOString().slice(0, 10);
   const isDateActive = today >= hodPhase.startDate && today <= effectiveEnd;
-  const open = !locked && cycle.stage === "validation" && isDateActive;
+  const open = !locked && (isDateActive || cycle.stage === "validation");
 
   const toggle = (nom: Nomination) => {
     if (readOnly || !open) return;

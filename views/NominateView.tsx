@@ -137,7 +137,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
   const effectiveEnd = getEffectiveEndDate(nomPhase);
   const today = new Date().toISOString().slice(0, 10);
   const isDateActive = today >= nomPhase.startDate && today <= effectiveEnd;
-  const open = !locked && cycle.stage === "nomination" && isDateActive;
+  const open = !locked && (isDateActive || cycle.stage === "nomination" && today >= nomPhase.startDate);
   const cat = catById(f.category);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
