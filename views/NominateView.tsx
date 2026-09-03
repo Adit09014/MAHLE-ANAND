@@ -95,6 +95,13 @@ export const NominateView: React.FC<NominateViewProps> = ({
     fetchEmps();
   }, []);
 
+  // Ensure selected month exists in available pending monthOptions
+  React.useEffect(() => {
+    if (monthOptions && monthOptions.length > 0 && !monthOptions.some((o) => o.value === month) && !editingNomId) {
+      setMonth(monthOptions[0].value);
+    }
+  }, [month, monthOptions, editingNomId, setMonth]);
+
   const dynamicUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
   const hodList = useMemo(() => allEmployees.filter(e => e.isHOD || e.role === "hod"), [allEmployees]);
 
@@ -128,7 +135,9 @@ export const NominateView: React.FC<NominateViewProps> = ({
   const timeline = getCycleTimeline(cycle);
   const nomPhase = timeline.nomination;
   const effectiveEnd = getEffectiveEndDate(nomPhase);
-  const open = cycle.stage === "nomination" && !locked;
+  const today = new Date().toISOString().slice(0, 10);
+  const isDateActive = today >= nomPhase.startDate && today <= effectiveEnd;
+  const open = !locked && cycle.stage === "nomination" && isDateActive;
   const cat = catById(f.category);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
 
@@ -187,6 +196,13 @@ export const NominateView: React.FC<NominateViewProps> = ({
   };
 
   const submit = () => {
+    if (!open) {
+      return setMsg({
+        bad: true,
+        text: `Self-nomination is currently closed. Submissions are only permitted between ${formatDatePretty(nomPhase.startDate)} and ${formatDatePretty(effectiveEnd)} configured by Admin.`,
+      });
+    }
+
     const code = (f.code || currentUser?.code || "").trim().toUpperCase();
     const name = (f.name || currentUser?.name || "").trim();
     const unit = (currentUser?.unitId || f.unit || "").trim();

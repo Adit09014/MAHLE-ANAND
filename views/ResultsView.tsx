@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Trophy, Award, Lock, Sparkles, CheckCircle2 } from "lucide-react";
+import { Trophy, Award, Lock, Sparkles, CheckCircle2, Calendar } from "lucide-react";
 import { catById, unitById, POINTS } from "../lib/constants";
 import { results } from "../lib/helpers";
 import { Cycle } from "../lib/types";
@@ -12,9 +12,17 @@ import Empty from "../components/Empty";
 
 export interface ResultsViewProps {
   cycle: Cycle;
+  month?: string;
+  setMonth?: (m: string) => void;
+  monthOptions?: { value: string; label: string }[];
 }
 
-export const ResultsView: React.FC<ResultsViewProps> = ({ cycle }) => {
+export const ResultsView: React.FC<ResultsViewProps> = ({
+  cycle,
+  month,
+  setMonth,
+  monthOptions,
+}) => {
   const isDeclared = cycle.stage === "announced";
   const res = useMemo(() => results(cycle), [cycle]);
 
@@ -39,16 +47,34 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ cycle }) => {
               </h2>
             </div>
           </div>
-          <div>
-            {isDeclared ? (
-              <Pill tone="good">
-                <CheckCircle2 size={12} className="mr-1 inline" /> Results Published by Admin
-              </Pill>
-            ) : (
-              <Pill tone="warn">
-                <Lock size={12} className="mr-1 inline" /> Result Pending Admin Declaration
-              </Pill>
+          <div className="flex flex-wrap items-center gap-3">
+            {monthOptions && setMonth && (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
+                <Calendar size={14} className="text-slate-400 shrink-0" />
+                <select
+                  value={month || cycle.month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-blue-950 outline-none cursor-pointer"
+                >
+                  {monthOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
+            <div>
+              {isDeclared ? (
+                <Pill tone="good">
+                  <CheckCircle2 size={12} className="mr-1 inline" /> Results Published by Admin
+                </Pill>
+              ) : (
+                <Pill tone="warn">
+                  <Lock size={12} className="mr-1 inline" /> Result Pending Admin Declaration
+                </Pill>
+              )}
+            </div>
           </div>
         </div>
       </Card>

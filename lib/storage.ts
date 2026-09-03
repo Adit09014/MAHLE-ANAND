@@ -8,6 +8,21 @@ import { emptyCycle } from "./helpers";
  * Zero localStorage is used.
  */
 
+export async function loadAllCycleStatuses(): Promise<Record<string, { stage: string; announcedAt: string | null; judges?: Array<{ id: string; name: string; code?: string }> }>> {
+  try {
+    const res = await fetch("/api/cycles", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && data.cycles) {
+        return data.cycles;
+      }
+    }
+  } catch (e) {
+    console.error("[loadAllCycleStatuses] Error fetching cycles from SSMS:", e);
+  }
+  return {};
+}
+
 export async function loadCycle(month: string): Promise<Cycle> {
   try {
     const res = await fetch(`/api/cycles/${month}`, { cache: "no-store" });

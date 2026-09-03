@@ -621,7 +621,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 )}
               </span>
               <span className="inline-flex items-center gap-1 font-semibold text-amber-600 shrink-0">
-                <Medal size={12} /> +{POINTS} Pts/Win
+                <Medal size={12} /> Panel Avg Pts
               </span>
             </div>
           </Card>
@@ -993,7 +993,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
                     <span className="rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase border border-amber-300/40">
-                      +{item.score !== undefined ? item.score.toFixed(1) : POINTS} Pts
+                      +{item.score !== undefined ? item.score.toFixed(1) : ""} Pts
                     </span>
                   </div>
                 ))
@@ -1121,7 +1121,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                   <p className="font-semibold text-blue-950">No Awards Won Yet</p>
                   <p className="text-[11px] text-blue-900/50 leading-relaxed">
-                    Participate in active recognition cycles. Winning an award earns <strong>+{POINTS} points</strong> toward year-end LSIP awards!
+                    Participate in active recognition cycles. Winning an award earns <strong>points from panel evaluations</strong> toward year-end LSIP awards!
                   </p>
                 </div>
               ) : (
@@ -1144,7 +1144,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </div>
                     </div>
                     <span className="rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase border border-amber-300/40">
-                      +{item.score !== undefined ? item.score.toFixed(1) : POINTS} Pts
+                      +{item.score !== undefined ? item.score.toFixed(1) : ""} Pts
                     </span>
                   </div>
                 ))

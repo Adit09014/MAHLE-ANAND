@@ -16,9 +16,21 @@ export interface JudgeViewProps {
   judgeId: string;
   locked: boolean;
   currentUser?: AuthUser | null;
+  month?: string;
+  setMonth?: (m: string) => void;
+  monthOptions?: { value: string; label: string }[];
 }
 
-export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, locked, currentUser }) => {
+export const JudgeView: React.FC<JudgeViewProps> = ({
+  cycle,
+  commit,
+  judgeId,
+  locked,
+  currentUser,
+  month,
+  setMonth,
+  monthOptions,
+}) => {
   // Dynamically resolve unique judge ID slot for the logged in user
   const effectiveJudgeId = useMemo(() => {
     if (currentUser) {
@@ -47,11 +59,20 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
     id: effectiveJudgeId,
     name: currentUser?.name || "Panel Judge",
   };
+
+  // Ensure selected month is one of the valid months where the user is an appointed judge
+  React.useEffect(() => {
+    if (monthOptions && monthOptions.length > 0 && !monthOptions.some((o) => o.value === month) && setMonth) {
+      setMonth(monthOptions[0].value);
+    }
+  }, [month, monthOptions, setMonth]);
   const pool = endorsedList(cycle);
   const timeline = getCycleTimeline(cycle);
   const judgePhase = timeline.panelScoring;
   const effectiveEnd = getEffectiveEndDate(judgePhase);
-  const open = cycle.stage === "judging" && !locked;
+  const today = new Date().toISOString().slice(0, 10);
+  const isDateActive = today >= judgePhase.startDate && today <= effectiveEnd;
+  const open = !locked && cycle.stage === "judging" && isDateActive;
 
   // Selected candidate state
   const [selectedNomId, setSelectedNomId] = useState<string>("");
@@ -82,6 +103,7 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
   const activeScore = activeNom ? (cycle.scores[activeNom.id] || {})[effectiveJudgeId] : undefined;
 
   const setScore = (nomId: string, value: number | undefined) => {
+    if (!open) return;
     const forNom = { ...(cycle.scores[nomId] || {}) };
     if (value === undefined || Number.isNaN(value)) {
       forNom[effectiveJudgeId] = -1; // Explicit withdrawal signal for score
@@ -113,7 +135,24 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {monthOptions && monthOptions.length > 0 && setMonth && (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
+                <Calendar size={14} className="text-slate-400 shrink-0" />
+                <select
+                  value={month || cycle.month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-blue-950 outline-none cursor-pointer"
+                >
+                  {monthOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="rounded-xl border border-blue-900/10 bg-slate-50 px-4 py-2 text-right">
               <span className="block text-[10px] font-bold uppercase text-slate-400">Scoring Progress</span>
               <strong className="text-base font-black text-blue-950">
@@ -182,7 +221,7 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
                 </tr>
                 <tr>
                   <td className="py-2.5 px-4 font-bold text-blue-950 border-r border-slate-200">Monthly points awarded</td>
-                  <td className="py-2.5 px-4">Winner receives <strong>10 points</strong> recorded in HR tracker.</td>
+                  <td className="py-2.5 px-4">Winner receives points equal to their <strong>average panel score</strong> recorded in HR tracker.</td>
                 </tr>
                 <tr>
                   <td className="py-2.5 px-4 font-bold text-blue-950 border-r border-slate-200">Year-end conversion</td>
@@ -219,7 +258,7 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
                 Judge scores: 8, 9, 8 &rarr; Panel Score = (8 + 9 + 8)/3 = 8.33 .
               </p>
               <p className="leading-relaxed">
-                Highest Panel Score across nominees wins and receives <strong>10 monthly points</strong>.
+                Highest Panel Score across nominees wins and receives points equal to their <strong>average panel score (8.33 points)</strong>.
               </p>
             </div>
           </div>
@@ -229,7 +268,11 @@ export const JudgeView: React.FC<JudgeViewProps> = ({ cycle, commit, judgeId, lo
       {!open && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
           <Lock size={15} className="shrink-0" />
-          <span>Panel scoring is currently CLOSED by Admin. Input scoring controls are disabled.</span>
+          <span>
+            {cycle.stage !== "judging"
+              ? `Panel scoring is currently CLOSED. The cycle is in the ${cycle.stage === "validation" ? "HOD Endorsement" : cycle.stage === "nomination" ? "Self-Nomination" : cycle.stage} stage.`
+              : `Panel scoring is currently CLOSED. Evaluations are scheduled between ${formatDatePretty(judgePhase.startDate)} and ${formatDatePretty(effectiveEnd)}.`}
+          </span>
         </div>
       )}
 

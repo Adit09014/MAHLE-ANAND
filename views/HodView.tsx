@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye } from "lucide-react";
+import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye, Sparkles } from "lucide-react";
 import { unitById, CATEGORIES, getMaxCategoriesForUnit, STAGES } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
@@ -48,6 +48,13 @@ export const HodView: React.FC<HodViewProps> = ({
     }
     fetchEmps();
   }, []);
+
+  // Ensure selected month exists in available pending monthOptions
+  useEffect(() => {
+    if (monthOptions && monthOptions.length > 0 && !monthOptions.some((o) => o.value === month) && setMonth) {
+      setMonth(monthOptions[0].value);
+    }
+  }, [month, monthOptions, setMonth]);
 
   const unit = unitById(unitId);
 
@@ -108,10 +115,12 @@ export const HodView: React.FC<HodViewProps> = ({
   const timeline = getCycleTimeline(cycle);
   const hodPhase = timeline.hodEndorsement;
   const effectiveEnd = getEffectiveEndDate(hodPhase);
-  const open = cycle.stage === "validation" && !locked;
+  const today = new Date().toISOString().slice(0, 10);
+  const isDateActive = today >= hodPhase.startDate && today <= effectiveEnd;
+  const open = !locked && cycle.stage === "validation" && isDateActive;
 
   const toggle = (nom: Nomination) => {
-    if (readOnly) return;
+    if (readOnly || !open) return;
     const next = { ...picks };
     if (next[nom.category] === nom.id) {
       next[nom.category] = ""; // Explicit withdrawal signal for server merge
@@ -131,7 +140,7 @@ export const HodView: React.FC<HodViewProps> = ({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Read-Only Notice Banner for HR Admin */}
       {readOnly && (
         <div className="flex items-center gap-2.5 rounded-xl border border-sky-200 bg-sky-50 p-3.5 text-xs text-sky-950 font-semibold shadow-2xs">
@@ -142,26 +151,47 @@ export const HodView: React.FC<HodViewProps> = ({
         </div>
       )}
 
-      {month && setMonth && monthOptions && (
-        <Card className="flex flex-col sm:flex-row gap-5 p-5 border border-blue-900/10 shadow-xs bg-white items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Select Viewing Month:
-            </span>
-            <select
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-semibold text-blue-950 outline-none focus:border-blue-700 shadow-xs cursor-pointer"
-            >
-              {monthOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+      {/* 1. Header Banner */}
+      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2.5 max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+              <Sparkles size={13} className="text-sky-300" />
+              <span>Head of Department Review Portal</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              HOD Candidate Endorsement
+            </h1>
+            <p className="text-sm text-sky-100/80 leading-relaxed">
+              Review and validate employee self-nominations from your department. Selected nominees advance to the HOD Panel Evaluation stage.
+            </p>
           </div>
-        </Card>
-      )}
+
+          {/* Month Selector Pill */}
+          <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-md shrink-0">
+            <Calendar size={15} className="text-sky-300" />
+            <span className="text-sky-100">Recognition Cycle:</span>
+            {monthOptions && monthOptions.length > 0 && setMonth ? (
+              <select
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="bg-transparent font-bold text-white outline-none cursor-pointer border-b border-white/30 pb-0.5 hover:border-white transition"
+              >
+                {monthOptions.map((o) => (
+                  <option key={o.value} value={o.value} className="text-blue-950 bg-white font-medium">
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <strong className="text-white">{cycle.month}</strong>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Policy Guidance Banner */}
       <div className="rounded-xl border border-blue-900/15 bg-gradient-to-r from-blue-900/5 via-blue-900/10 to-blue-900/5 p-4 text-xs text-blue-950 shadow-sm">
@@ -231,9 +261,9 @@ export const HodView: React.FC<HodViewProps> = ({
         <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-950 shadow-2xs">
           <Lock size={15} className="text-amber-800 shrink-0" />
           <span>
-            {cycle.stage === "nomination"
-              ? "HOD Validation is currently waiting to open. Endorsements unlock once the cycle reaches HOD Validation stage (8th – 9th) after employee nominations close."
-              : `HOD Validation is closed — the cycle has moved to ${STAGES.find((s) => s.id === cycle.stage)?.label || cycle.stage}.`}
+            {cycle.stage !== "validation"
+              ? `HOD Endorsement is currently CLOSED. The cycle is in the ${cycle.stage === "nomination" ? "Self-Nomination" : cycle.stage === "judging" ? "Panel Scoring" : cycle.stage} stage.`
+              : `HOD Endorsement is currently CLOSED. Submissions are scheduled between ${formatDatePretty(hodPhase.startDate)} and ${formatDatePretty(effectiveEnd)}.`}
           </span>
         </div>
       )}

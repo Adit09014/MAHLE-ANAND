@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { UNITS, STAGES, POINTS, getDynamicUnits } from "../lib/constants";
 import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
-import { loadCycle, saveCycle, loadBranding, loadPoints } from "../lib/storage";
+import { loadCycle, saveCycle, loadBranding, loadPoints, loadAllCycleStatuses } from "../lib/storage";
 import { getAuthSession, logoutUser } from "../lib/auth";
 import { Cycle, PointsState, Branding, Role, AuthUser } from "../lib/types";
 import BrandMark from "../components/BrandMark";
@@ -52,6 +52,16 @@ export default function RRAdmin() {
   const [cycle, setCycle] = useState<Cycle>(emptyCycle(thisMonth));
   const [points, setPoints] = useState<PointsState>({});
   const [brand, setBrand] = useState<Branding>({ logoUrl: "" });
+  const [cycleStatuses, setCycleStatuses] = useState<
+    Record<
+      string,
+      {
+        stage: string;
+        announcedAt: string | null;
+        judges?: Array<{ id: string; name: string; code?: string }>;
+      }
+    >
+  >({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [role, setRole] = useState<TabId>("dashboard");
@@ -83,18 +93,27 @@ export default function RRAdmin() {
 
   const monthOptions = useMemo(() => {
     const opts = [];
-    const d = new Date();
-    // 1 current + 6 future = 7 iterations. No past months.
-    for (let i = 0; i < 7; i++) {
+    // Last 2 months (-2, -1), Current month (0), Next 3 months (+1, +2, +3)
+    for (let i = -2; i <= 3; i++) {
+      const d = new Date();
+      d.setDate(1); // avoid 31st overflow
+      d.setMonth(d.getMonth() + i);
       const year = d.getFullYear();
       const m = d.getMonth() + 1;
       const val = `${year}-${String(m).padStart(2, "0")}`;
       const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
       opts.push({ value: val, label });
-      d.setMonth(d.getMonth() + 1);
     }
     return opts;
   }, []);
+
+  // Filter out declared/announced months — only show months where result is pending
+  const pendingMonthOptions = useMemo(() => {
+    return monthOptions.filter((o) => {
+      const st = cycleStatuses[o.value];
+      return st?.stage !== "announced";
+    });
+  }, [monthOptions, cycleStatuses]);
 
   // Load session from cookie and set RBAC role defaults
   useEffect(() => {
@@ -115,14 +134,16 @@ export default function RRAdmin() {
     if (!silent) setLoading(true);
     setErr(null);
     try {
-      const [c, p, b] = await Promise.all([
+      const [c, p, b, statuses] = await Promise.all([
         loadCycle(m),
         loadPoints(),
         loadBranding(),
+        loadAllCycleStatuses(),
       ]);
       setCycle(c);
       setPoints(p);
       setBrand(b);
+      setCycleStatuses(statuses);
     } catch (e) {
       if (!silent) setErr("Couldn't reach shared storage. Try refreshing the cycle.");
     }
@@ -256,25 +277,45 @@ export default function RRAdmin() {
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  // Check if current user is an appointed panel judge for this cycle in real time (live)
-  const isAppointedJudgeInCycle = Boolean(
-    currentUser &&
-    cycle?.judges?.some(
-      (j) =>
-        (j.code && j.code.trim().toUpperCase() === currentUser.code?.trim().toUpperCase()) ||
-        (j.name && currentUser.name && j.name.trim().toLowerCase() === currentUser.name.trim().toLowerCase())
-    )
+  // Helper to check if current user is an appointed judge for a specific month
+  const isUserJudgeForMonth = useCallback(
+    (monthVal: string) => {
+      if (!currentUser) return false;
+      const uCode = (currentUser.code || "").trim().toUpperCase();
+      const uName = (currentUser.name || "").trim().toLowerCase();
+
+      const judgesList =
+        monthVal === cycle?.month && cycle?.judges
+          ? cycle.judges
+          : cycleStatuses[monthVal]?.judges || [];
+
+      return judgesList.some(
+        (j) =>
+          (j.code && j.code.trim().toUpperCase() === uCode) ||
+          (j.name && uName && j.name.trim().toLowerCase() === uName)
+      );
+    },
+    [currentUser, cycle, cycleStatuses]
   );
 
-  const isPanelJudge = Boolean(currentUser?.isPanelJudge) || isAppointedJudgeInCycle;
+  // Only months where the current user is explicitly an appointed panel judge
+  const judgeMonthOptions = useMemo(() => {
+    return monthOptions.filter((o) => isUserJudgeForMonth(o.value));
+  }, [monthOptions, isUserJudgeForMonth]);
+
+  const isPanelJudge = judgeMonthOptions.length > 0;
   const isAdmin = Boolean(currentUser?.isAdmin) || currentUser?.role === "admin";
   const isHOD = Boolean(currentUser?.isHOD) || currentUser?.role === "hod";
 
   const allowedRoles: TabId[] = currentUser
     ? isAdmin
       ? isHOD
-        ? ["dashboard", "hod", "judge", "results", "hr", "settings"]
-        : ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
+        ? isPanelJudge
+          ? ["dashboard", "hod", "judge", "results", "hr", "settings"]
+          : ["dashboard", "hod", "results", "hr", "settings"]
+        : isPanelJudge
+          ? ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
+          : ["dashboard", "employee", "hod", "results", "hr", "settings"]
       : isHOD
         ? isPanelJudge
           ? ["dashboard", "hod", "judge", "results", "settings"]
@@ -514,7 +555,7 @@ export default function RRAdmin() {
                   locked={locked}
                   month={month}
                   setMonth={setMonth}
-                  monthOptions={monthOptions}
+                  monthOptions={pendingMonthOptions.length > 0 ? pendingMonthOptions : monthOptions}
                 />
               )}
               {activeRole === "hod" && (
@@ -526,7 +567,7 @@ export default function RRAdmin() {
                   readOnly={currentUser?.role === "hr" || currentUser?.role === "admin"}
                   month={month}
                   setMonth={setMonth}
-                  monthOptions={monthOptions}
+                  monthOptions={pendingMonthOptions.length > 0 ? pendingMonthOptions : monthOptions}
                 />
               )}
               {activeRole === "judge" && (
@@ -536,6 +577,9 @@ export default function RRAdmin() {
                   commit={commit}
                   locked={locked}
                   currentUser={currentUser}
+                  month={month}
+                  setMonth={setMonth}
+                  monthOptions={judgeMonthOptions}
                 />
               )}
               {activeRole === "hr" && (
@@ -555,6 +599,9 @@ export default function RRAdmin() {
               {activeRole === "results" && (
                 <ResultsView
                   cycle={cycle}
+                  month={month}
+                  setMonth={setMonth}
+                  monthOptions={monthOptions}
                 />
               )}
               {activeRole === "settings" && (

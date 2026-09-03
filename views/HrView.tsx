@@ -573,6 +573,10 @@ export const HrView: React.FC<HrViewProps> = ({
     const currentTimeline = getCycleTimeline(cycle);
     const currentPhase = currentTimeline[phaseKey];
     const nextPhase: PhaseTimeline = { ...currentPhase, ...updates };
+    if (updates.isExtended === false) {
+      nextPhase.isExtended = false;
+      delete (nextPhase as any).extendedUntil;
+    }
     const nextTimeline: CycleTimeline = {
       ...currentTimeline,
       [phaseKey]: nextPhase,
@@ -773,7 +777,7 @@ export const HrView: React.FC<HrViewProps> = ({
         "Employee Name",
         "Department / Unit",
         "Monthly Wins Count",
-        "Cumulative Monthly Points (10 pts/win)",
+        "Cumulative Monthly Panel Points",
         "LSIP 50% Weightage Score",
         "Winning Month(s) & Categories",
       ],
@@ -1049,12 +1053,14 @@ export const HrView: React.FC<HrViewProps> = ({
                     <input
                       type="date"
                       value={effectiveEnd}
-                      onChange={(e) =>
-                        updatePhaseTimeline(key, {
-                          isExtended: true,
-                          extendedUntil: e.target.value,
-                        })
-                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (phase.isExtended) {
+                          updatePhaseTimeline(key, { isExtended: true, extendedUntil: val });
+                        } else {
+                          updatePhaseTimeline(key, { endDate: val });
+                        }
+                      }}
                       className={`${inputCls} ${phase.isExtended ? "border-amber-500 font-semibold text-amber-950 bg-amber-50" : ""}`}
                     />
                   </div>

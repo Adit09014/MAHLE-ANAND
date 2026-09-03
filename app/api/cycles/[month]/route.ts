@@ -123,20 +123,11 @@ export async function POST(
       });
     }
 
-    // Merge timeline phases
-    const mergedTimeline = {
-      nomination: {
-        ...(existing.timeline?.nomination || {}),
-        ...(body.timeline?.nomination || {}),
-      },
-      hodEndorsement: {
-        ...(existing.timeline?.hodEndorsement || {}),
-        ...(body.timeline?.hodEndorsement || {}),
-      },
-      panelScoring: {
-        ...(existing.timeline?.panelScoring || {}),
-        ...(body.timeline?.panelScoring || {}),
-      },
+    // Save timeline phases (prefer authoritative incoming timeline)
+    const mergedTimeline = body.timeline || existing.timeline || {
+      nomination: { startDate: `${month}-01`, endDate: `${month}-07`, isExtended: false },
+      hodEndorsement: { startDate: `${month}-08`, endDate: `${month}-09`, isExtended: false },
+      panelScoring: { startDate: `${month}-10`, endDate: `${month}-12`, isExtended: false },
     };
 
     const finalCycle: Cycle = {
