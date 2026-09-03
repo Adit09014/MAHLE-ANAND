@@ -713,3 +713,44 @@ GO
 
 PRINT '=== Successfully seeded all employees, HODs, and Admin into dbo.Employees & dbo.EmpRoles ===';
 GO
+
+
+USE [Rewards];
+GO
+ALTER TABLE dbo.EmpRoles DROP CONSTRAINT FK_EmpRoles_Employees;
+ALTER TABLE dbo.EmpPasswords DROP CONSTRAINT FK_EmpPasswords_Employees;
+
+ALTER TABLE dbo.EmpRoles 
+    ADD CONSTRAINT FK_EmpRoles_Employees 
+    FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
+    ON DELETE CASCADE 
+    ON UPDATE CASCADE; 
+
+ALTER TABLE dbo.EmpPasswords 
+    ADD CONSTRAINT FK_EmpPasswords_Employees 
+    FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
+    ON DELETE CASCADE 
+    ON UPDATE CASCADE; 
+GO
+
+USE [Rewards];
+GO
+
+-- 1. Drop Foreign Key constraints
+ALTER TABLE dbo.EmpRoles DROP CONSTRAINT IF EXISTS FK_EmpRoles_Employees;
+ALTER TABLE dbo.EmpPasswords DROP CONSTRAINT IF EXISTS FK_EmpPasswords_Employees;
+
+-- 2. Truncate Tables
+TRUNCATE TABLE dbo.EmpPasswords;
+TRUNCATE TABLE dbo.EmpRoles;
+TRUNCATE TABLE dbo.Employees;
+
+-- 3. Re-add Foreign Keys with CASCADE
+ALTER TABLE dbo.EmpRoles ADD CONSTRAINT FK_EmpRoles_Employees
+    FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
+    ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE dbo.EmpPasswords ADD CONSTRAINT FK_EmpPasswords_Employees
+    FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
+    ON DELETE CASCADE ON UPDATE CASCADE;
+GO
