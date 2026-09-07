@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { Lock, Clock, Calendar, Search, Filter, Scale, CheckCircle2, User, Award, FileText, Sparkles, Star, ChevronRight, Check } from "lucide-react";
 import { CATEGORIES, catById, unitById } from "../lib/constants";
-import { endorsedList, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
+import { endorsedList, getCycleTimeline, getEffectiveEndDate, formatDatePretty, isPanelScoringOpen } from "../lib/helpers";
 import { AuthUser, Cycle } from "../lib/types";
 import Card from "../components/Card";
 import Label from "../components/Label";
@@ -70,9 +70,7 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
   const timeline = getCycleTimeline(cycle);
   const judgePhase = timeline.panelScoring;
   const effectiveEnd = getEffectiveEndDate(judgePhase);
-  const today = new Date().toISOString().slice(0, 10);
-  const isDateActive = today >= judgePhase.startDate && today <= effectiveEnd;
-  const open = !locked && (isDateActive || cycle.stage === "judging");
+  const open = !locked && isPanelScoringOpen(cycle);
 
   // Selected candidate state
   const [selectedNomId, setSelectedNomId] = useState<string>("");

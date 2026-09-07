@@ -24,6 +24,7 @@ import {
   Scale,
   Sliders,
   Image as ImageIcon,
+  Lock,
 } from "lucide-react";
 import { STAGES, PANEL_SIZE, POINTS, UNITS, catById, unitById, getDynamicUnits } from "../lib/constants";
 import {
@@ -1010,29 +1011,49 @@ export const HrView: React.FC<HrViewProps> = ({
             ] as const
           ).map(({ key, title, desc, phase }) => {
             const effectiveEnd = getEffectiveEndDate(phase);
+            const isClosed = Boolean(phase.isClosed);
             return (
               <div
                 key={key}
-                className={`rounded-2xl border p-5 transition ${phase.isExtended
+                className={`rounded-2xl border p-5 transition ${
+                  isClosed
+                    ? "border-rose-300 bg-rose-50/50 shadow-xs"
+                    : phase.isExtended
                     ? "border-amber-400/80 bg-amber-50/60 shadow-xs"
                     : "border-blue-900/10 bg-slate-50/40"
-                  }`}
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h4 className="text-xs font-extrabold text-blue-950 uppercase tracking-wider flex items-center gap-2">
+                    <h4 className="text-xs font-extrabold text-blue-950 uppercase tracking-wider flex items-center gap-2 flex-wrap">
                       {title}
-                      {phase.isExtended && (
+                      {isClosed ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-300 px-2.5 py-0.5 text-[10px] font-bold text-rose-900">
+                          <Lock size={11} /> MANUALLY CLOSED
+                        </span>
+                      ) : phase.isExtended ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
                           <Clock size={11} /> EXTENDED
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-300 px-2.5 py-0.5 text-[10px] font-bold text-emerald-900">
+                          <CheckCircle2 size={11} /> ACTIVE
                         </span>
                       )}
                     </h4>
                     <p className="mt-1 text-xs text-blue-900/60">{desc}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-mono text-xs font-bold text-blue-950 bg-white px-3 py-1 rounded-lg border border-blue-900/10">
-                      Active: {formatDatePretty(phase.startDate)} – {formatDatePretty(effectiveEnd)}
+                    <p
+                      className={`font-mono text-xs font-bold px-3 py-1 rounded-lg border ${
+                        isClosed
+                          ? "bg-rose-100 border-rose-300 text-rose-900"
+                          : "bg-white border-blue-900/10 text-blue-950"
+                      }`}
+                    >
+                      {isClosed
+                        ? "Window Status: Closed Manually by Admin"
+                        : `Active: ${formatDatePretty(phase.startDate)} – ${formatDatePretty(effectiveEnd)}`}
                     </p>
                   </div>
                 </div>
@@ -1065,7 +1086,31 @@ export const HrView: React.FC<HrViewProps> = ({
                     />
                   </div>
 
-                  {/* Date Extension Buttons (DUPLICATE PLUS SIGN FIXED) */}
+                  {/* Manual Close / Reopen Toggle Button */}
+                  <div>
+                    <Label>Window Access</Label>
+                    {isClosed ? (
+                      <button
+                        type="button"
+                        onClick={() => updatePhaseTimeline(key, { isClosed: false })}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-2xs active:scale-95"
+                        title="Reopen this timeline window for submissions"
+                      >
+                        <CheckCircle2 size={13} /> Reopen Window
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => updatePhaseTimeline(key, { isClosed: true })}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-900 hover:bg-rose-100 hover:border-rose-400 transition shadow-2xs active:scale-95"
+                        title="Close this timeline window immediately"
+                      >
+                        <Lock size={13} className="text-rose-700" /> Close Window Now
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Date Extension Buttons */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-semibold text-blue-900/60 mr-1">Extend Deadline:</span>
                     <button

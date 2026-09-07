@@ -180,7 +180,7 @@ export default function RRAdmin() {
     try {
       // Always fetch the latest DB state first to avoid overwriting concurrent changes
       const fresh = await loadCycle(next.month);
-      
+
       // Merge: use the fresh DB data as baseline, overlay only the fields that changed
       const merged: Cycle = {
         ...fresh,
@@ -232,7 +232,7 @@ export default function RRAdmin() {
           const incoming = next.scores[nomId] || {};
           const existing = mergedScores[nomId] || {};
           const combined = { ...existing, ...incoming };
-          
+
           Object.keys(combined).forEach((jId) => {
             if (combined[jId] === -1) {
               delete combined[jId];
@@ -359,9 +359,8 @@ export default function RRAdmin() {
 
       {/* Left Sidebar Navigation Container */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 min-w-[16rem] max-w-[16rem] shrink-0 grow-0 bg-white border-r border-slate-200/80 flex flex-col justify-between transition-transform duration-200 shadow-lg md:shadow-none md:sticky md:top-0 md:h-screen md:translate-x-0 overflow-y-auto ${
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 min-w-[16rem] max-w-[16rem] shrink-0 grow-0 bg-white border-r border-slate-200/80 flex flex-col justify-between transition-transform duration-200 shadow-lg md:shadow-none md:sticky md:top-0 md:h-screen md:translate-x-0 overflow-y-auto ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         {/* Top Header & Navigation Section */}
         <div>
@@ -370,7 +369,7 @@ export default function RRAdmin() {
             <BrandMark url={brand.logoUrl} className="h-9 max-w-full w-auto" />
             <div>
               <h1 className="text-sm font-extrabold tracking-tight text-blue-950 leading-tight">
-                MAHLE ANAND Filter System
+                MAHLE ANAND Filter Syssdtem
               </h1>
               <p className="text-[11px] font-medium text-slate-400">
                 Corporate Rewards
@@ -390,11 +389,10 @@ export default function RRAdmin() {
                     setRole(t.id);
                     setMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-150 ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-150 ${isActive
                       ? "bg-sky-100/70 text-blue-950 shadow-xs border border-sky-200/60"
                       : "text-slate-600 hover:bg-slate-50 hover:text-blue-950"
-                  }`}
+                    }`}
                 >
                   <Icon size={18} className={isActive ? "text-blue-700 shrink-0" : "text-slate-400 shrink-0"} />
                   <span className="truncate">{t.label}</span>

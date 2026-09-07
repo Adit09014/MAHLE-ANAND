@@ -50,6 +50,7 @@ export interface PhaseTimeline {
   isExtended?: boolean;
   extendedUntil?: string; // YYYY-MM-DD
   extendedDays?: number;
+  isClosed?: boolean; // Manual closure override by Admin
 }
 
 export interface CycleTimeline {

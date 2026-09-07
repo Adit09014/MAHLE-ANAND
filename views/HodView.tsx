@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye, Sparkles } from "lucide-react";
 import { unitById, CATEGORIES, getMaxCategoriesForUnit, STAGES } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
-import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
+import { getCycleTimeline, getEffectiveEndDate, formatDatePretty, isHodEndorsementOpen } from "../lib/helpers";
 import Card from "../components/Card";
 import Label from "../components/Label";
 import Button from "../components/Button";
@@ -115,9 +115,7 @@ export const HodView: React.FC<HodViewProps> = ({
   const timeline = getCycleTimeline(cycle);
   const hodPhase = timeline.hodEndorsement;
   const effectiveEnd = getEffectiveEndDate(hodPhase);
-  const today = new Date().toISOString().slice(0, 10);
-  const isDateActive = today >= hodPhase.startDate && today <= effectiveEnd;
-  const open = !locked && (isDateActive || cycle.stage === "validation");
+  const open = !locked && isHodEndorsementOpen(cycle);
 
   const toggle = (nom: Nomination) => {
     if (readOnly || !open) return;

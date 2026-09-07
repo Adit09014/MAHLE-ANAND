@@ -43,6 +43,36 @@ export function getEffectiveEndDate(phase: PhaseTimeline): string {
   return phase.endDate;
 }
 
+export function isNominationOpen(cycle: Cycle): boolean {
+  if (cycle.stage !== "nomination") return false;
+  const timeline = getCycleTimeline(cycle);
+  const nomPhase = timeline.nomination;
+  if (nomPhase.isClosed) return false;
+  const effectiveEnd = getEffectiveEndDate(nomPhase);
+  const today = new Date().toISOString().slice(0, 10);
+  return today >= nomPhase.startDate && today <= effectiveEnd;
+}
+
+export function isHodEndorsementOpen(cycle: Cycle): boolean {
+  if (cycle.stage !== "validation") return false;
+  const timeline = getCycleTimeline(cycle);
+  const hodPhase = timeline.hodEndorsement;
+  if (hodPhase.isClosed) return false;
+  const effectiveEnd = getEffectiveEndDate(hodPhase);
+  const today = new Date().toISOString().slice(0, 10);
+  return today <= effectiveEnd;
+}
+
+export function isPanelScoringOpen(cycle: Cycle): boolean {
+  if (cycle.stage !== "judging") return false;
+  const timeline = getCycleTimeline(cycle);
+  const judgePhase = timeline.panelScoring;
+  if (judgePhase.isClosed) return false;
+  const effectiveEnd = getEffectiveEndDate(judgePhase);
+  const today = new Date().toISOString().slice(0, 10);
+  return today <= effectiveEnd;
+}
+
 export function addDaysToDateStr(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T00:00:00`);
   if (isNaN(d.getTime())) return dateStr;

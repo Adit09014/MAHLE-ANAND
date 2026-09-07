@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Lock, Clock, Calendar, CheckCircle2, ShieldAlert, FileText, Check, Edit3, X } from "lucide-react";
 import { UNITS, CATEGORIES, catById, unitById, getDynamicUnits } from "../lib/constants";
 import { AuthUser, Cycle, Nomination } from "../lib/types";
-import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
+import { getCycleTimeline, getEffectiveEndDate, formatDatePretty, isNominationOpen } from "../lib/helpers";
 import Card from "../components/Card";
 import Label from "../components/Label";
 import Button from "../components/Button";
@@ -136,10 +136,29 @@ export const NominateView: React.FC<NominateViewProps> = ({
   const nomPhase = timeline.nomination;
   const effectiveEnd = getEffectiveEndDate(nomPhase);
   const today = new Date().toISOString().slice(0, 10);
-  const isDateActive = today >= nomPhase.startDate && today <= effectiveEnd;
-  const open = !locked && (isDateActive || cycle.stage === "nomination" && today >= nomPhase.startDate);
+  const open = !locked && isNominationOpen(cycle);
   const cat = catById(f.category);
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+
+  const closedReason = useMemo(() => {
+    if (open) return null;
+    if (nomPhase.isClosed) {
+      return "The self-nomination window has been closed manually by Admin.";
+    }
+    if (cycle.stage === "validation") {
+      return "The cycle has advanced to HOD Review & Endorsement stage. Self-nominations are now closed.";
+    }
+    if (cycle.stage === "judging") {
+      return "The cycle has advanced to Panel Judging stage. Self-nominations are now closed.";
+    }
+    if (cycle.stage === "announced" || locked) {
+      return "This cycle has been finalized and winners have been declared.";
+    }
+    if (today < nomPhase.startDate) {
+      return `Self-nomination will open on ${formatDatePretty(nomPhase.startDate)}.`;
+    }
+    return `The self-nomination deadline (${formatDatePretty(effectiveEnd)}) has passed for this cycle.`;
+  }, [open, nomPhase.isClosed, cycle.stage, locked, today, nomPhase.startDate, effectiveEnd]);
 
   const userCode = (currentUser?.code || "").toUpperCase();
   const userName = (currentUser?.name || "").toLowerCase().trim();
@@ -199,7 +218,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
     if (!open) {
       return setMsg({
         bad: true,
-        text: `Self-nomination is currently closed. Submissions are only permitted between ${formatDatePretty(nomPhase.startDate)} and ${formatDatePretty(effectiveEnd)} configured by Admin.`,
+        text: closedReason || "Self-nomination is currently closed for this cycle.",
       });
     }
 
@@ -364,8 +383,9 @@ export const NominateView: React.FC<NominateViewProps> = ({
         </div>
 
         {!open && (
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-900">
-            <Lock size={14} className="shrink-0" /> The nomination window is currently closed for this cycle.
+          <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold text-rose-900">
+            <Lock size={14} className="shrink-0 text-rose-700" />
+            <span>{closedReason || "The nomination window is currently closed for this cycle."}</span>
           </div>
         )}
 
