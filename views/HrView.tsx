@@ -245,6 +245,7 @@ export const HrView: React.FC<HrViewProps> = ({
   const [stageAuthPassword, setStageAuthPassword] = useState("");
   const [stageAuthError, setStageAuthError] = useState<string | null>(null);
   const [stageAuthSubmitting, setStageAuthSubmitting] = useState(false);
+  const [stageSuccessMsg, setStageSuccessMsg] = useState<string | null>(null);
 
   // Admin Confirmation & Password Auth Modal States
   const [showConfirmPrompt, setShowConfirmPrompt] = useState(false);
@@ -287,6 +288,18 @@ export const HrView: React.FC<HrViewProps> = ({
       type: "announce_winner",
       title: "Declare Winners & Publish Results",
       warning: "Declaring winners will finalize the award cycle and publish public leaderboard results.",
+    });
+    setStageAuthPassword("");
+    setStageAuthError(null);
+  };
+
+  const handleRevertDeclaredResultClick = (targetStage = "judging") => {
+    setStageAuthAction({
+      type: "change_stage",
+      targetStage,
+      title: "Revert Declared Result to Normal",
+      warning:
+        "Reverting declared results will unpublish official winners from the public leaderboard and results view, return the cycle to normal evaluation (Panel Scoring / Judging), and roll back all LSIP ledger points recorded for this month.",
     });
     setStageAuthPassword("");
     setStageAuthError(null);
@@ -345,8 +358,17 @@ export const HrView: React.FC<HrViewProps> = ({
             }
           }
           commit({ ...cycle, stage: action.targetStage, announcedAt: action.targetStage === "announced" ? cycle.announcedAt : null });
+          if (cycle.stage === "announced" && action.targetStage !== "announced") {
+            setStageSuccessMsg("Declared results successfully reverted! Cycle returned to normal evaluation stage and LSIP points were rolled back.");
+            setTimeout(() => setStageSuccessMsg(null), 6000);
+          } else {
+            setStageSuccessMsg(`Cycle stage updated to "${action.targetStage}".`);
+            setTimeout(() => setStageSuccessMsg(null), 6000);
+          }
         } else if (action.type === "announce_winner") {
           await announce();
+          setStageSuccessMsg("Winners officially declared and published! Public leaderboard is now live.");
+          setTimeout(() => setStageSuccessMsg(null), 6000);
         }
       }
     } catch (err) {
@@ -950,7 +972,14 @@ export const HrView: React.FC<HrViewProps> = ({
       </div>
 
       {/* 2. Admin Stage Controls & Metric Summary Cards */}
-      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white space-y-4">
+        {stageSuccessMsg && (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-900 animate-in fade-in">
+            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <span>{stageSuccessMsg}</span>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-900/10 pb-5">
           <div className="space-y-3">
             {month && setMonth && monthOptions && (
@@ -975,14 +1004,79 @@ export const HrView: React.FC<HrViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={handleAnnounceClick}
-              disabled={cycle.stage === "announced" || pool.length === 0}
-              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-amber-950 shadow-md hover:bg-amber-400 disabled:opacity-50 active:scale-95 transition"
-            >
-              <Trophy size={15} /> Declare Winners <ChevronRight size={14} />
-            </button>
+            {cycle.stage === "announced" ? (
+              <>
+                <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 shadow-xs">
+                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                  <span>Winners Declared &amp; Published</span>
+                  {cycle.announcedAt && (
+                    <span className="text-[10px] font-normal text-emerald-700 hidden sm:inline">
+                      • {new Date(cycle.announcedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handleRevertDeclaredResultClick("judging")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-rose-800 shadow-xs hover:bg-rose-100 active:scale-95 transition"
+                  title="Revert declared results and return cycle back to normal evaluation stage"
+                >
+                  <RotateCcw size={15} className="text-rose-600" />
+                  Revert Declared Result
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={handleAnnounceClick}
+                disabled={pool.length === 0}
+                className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-amber-950 shadow-md hover:bg-amber-400 disabled:opacity-50 active:scale-95 transition"
+                title={pool.length === 0 ? "Cannot declare winners with 0 endorsed candidates" : "Declare official winners and publish results"}
+              >
+                <Trophy size={15} /> Declare Winners <ChevronRight size={14} />
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Cycle Stage Pipeline Stepper */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
+              <Sliders size={13} /> Active Stage:
+            </span>
+            {STAGES.map((stg, idx) => {
+              const isCurrent = cycle.stage === stg.id;
+              return (
+                <button
+                  key={stg.id}
+                  onClick={() => {
+                    if (cycle.stage === "announced" && stg.id !== "announced") {
+                      handleRevertDeclaredResultClick(stg.id);
+                    } else {
+                      handleStageChangeClick(stg.id);
+                    }
+                  }}
+                  disabled={isCurrent}
+                  title={isCurrent ? "Current active cycle stage" : `Click to transition cycle stage to ${stg.label}`}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                    isCurrent
+                      ? stg.id === "announced"
+                        ? "bg-emerald-600 text-white shadow-xs"
+                        : "bg-[#0A2540] text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <span>{idx + 1}. {stg.label}</span>
+                  {isCurrent && <span className="text-[10px] opacity-80">(Active)</span>}
+                </button>
+              );
+            })}
+          </div>
+          {cycle.stage === "announced" && (
+            <span className="text-xs text-rose-700 font-semibold flex items-center gap-1">
+              <RotateCcw size={12} /> Results are live — Click &quot;Revert Declared Result&quot; to return to normal
+            </span>
+          )}
         </div>
 
         {/* 4 Summary Metric Cards */}
@@ -1538,10 +1632,22 @@ export const HrView: React.FC<HrViewProps> = ({
 
       {/* 5. Live Standings & Results Preview */}
       <div>
-        <h3 className="mb-3 text-base font-bold tracking-tight text-blue-950 flex items-center gap-2">
-          <Trophy size={18} className="text-amber-500" />
-          {cycle.stage === "announced" ? "Official Announced Winners" : "Live Candidate Standings"}
-        </h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-base font-bold tracking-tight text-blue-950 flex items-center gap-2">
+            <Trophy size={18} className="text-amber-500" />
+            {cycle.stage === "announced" ? "Official Announced Winners" : "Live Candidate Standings"}
+          </h3>
+          {cycle.stage === "announced" && (
+            <button
+              onClick={() => handleRevertDeclaredResultClick("judging")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-3.5 py-1.5 text-xs font-bold text-rose-800 hover:bg-rose-100 transition shadow-xs active:scale-95"
+              title="Revert declared results and return cycle back to normal evaluation stage"
+            >
+              <RotateCcw size={13} className="text-rose-600" />
+              Revert Declared Result
+            </button>
+          )}
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           {res.map((r) => (
             <Card key={r.category.id + (r.slotLabel || "")} className="p-5 border border-blue-900/10 bg-white">
@@ -1850,8 +1956,18 @@ export const HrView: React.FC<HrViewProps> = ({
           <div className="w-full max-w-md rounded-2xl border border-blue-900/10 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
-                  <Key size={18} />
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${
+                    stageAuthAction.title.includes("Revert")
+                      ? "bg-rose-100 text-rose-600"
+                      : "bg-amber-500/10 text-amber-600"
+                  }`}
+                >
+                  {stageAuthAction.title.includes("Revert") ? (
+                    <RotateCcw size={18} />
+                  ) : (
+                    <Key size={18} />
+                  )}
                 </div>
                 <h3 className="text-sm font-bold text-blue-950">{stageAuthAction.title}</h3>
               </div>
@@ -1861,9 +1977,43 @@ export const HrView: React.FC<HrViewProps> = ({
             </div>
 
             {stageAuthAction.warning && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 font-medium leading-relaxed">
-                <AlertTriangle size={17} className="text-amber-600 shrink-0 mt-0.5" />
+              <div
+                className={`flex items-start gap-2.5 rounded-xl border p-3 text-xs font-medium leading-relaxed ${
+                  stageAuthAction.title.includes("Revert")
+                    ? "border-rose-200 bg-rose-50 text-rose-950"
+                    : "border-amber-300 bg-amber-50 text-amber-950"
+                }`}
+              >
+                <AlertTriangle
+                  size={17}
+                  className={`shrink-0 mt-0.5 ${
+                    stageAuthAction.title.includes("Revert") ? "text-rose-600" : "text-amber-600"
+                  }`}
+                />
                 <span>{stageAuthAction.warning}</span>
+              </div>
+            )}
+
+            {stageAuthAction.type === "change_stage" && cycle.stage === "announced" && (
+              <div>
+                <Label>Revert To Stage</Label>
+                <select
+                  value={stageAuthAction.targetStage}
+                  onChange={(e) =>
+                    setStageAuthAction({
+                      ...stageAuthAction,
+                      targetStage: e.target.value,
+                    })
+                  }
+                  className={inputCls}
+                >
+                  <option value="judging">Panel Evaluation / Scoring (Normal Pre-Announcement Stage)</option>
+                  <option value="validation">HOD Validation &amp; Endorsements</option>
+                  <option value="nomination">Employee Self-Nominations Window</option>
+                </select>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Select the stage the cycle should return to once results are unpublished.
+                </p>
               </div>
             )}
 
@@ -1873,7 +2023,7 @@ export const HrView: React.FC<HrViewProps> = ({
 
             {stageAuthError && (
               <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-                <AlertTriangle size={15} />
+                <AlertTriangle size={15} className="shrink-0" />
                 <span>{stageAuthError}</span>
               </div>
             )}
@@ -1902,9 +2052,19 @@ export const HrView: React.FC<HrViewProps> = ({
                 <button
                   type="submit"
                   disabled={stageAuthSubmitting}
-                  className="rounded-xl bg-[#0A2540] px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900"
+                  className={`rounded-xl px-4 py-2 text-xs font-bold text-white shadow-md transition ${
+                    stageAuthAction.title.includes("Revert")
+                      ? "bg-rose-600 hover:bg-rose-700"
+                      : "bg-[#0A2540] hover:bg-blue-900"
+                  }`}
                 >
-                  {stageAuthSubmitting ? "Authorizing..." : "Confirm & Authorize"}
+                  {stageAuthSubmitting
+                    ? "Authorizing..."
+                    : stageAuthAction.title.includes("Revert")
+                    ? "Confirm & Revert Result"
+                    : stageAuthAction.type === "announce_winner"
+                    ? "Confirm & Declare Winners"
+                    : "Confirm & Authorize"}
                 </button>
               </div>
             </form>

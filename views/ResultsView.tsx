@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Trophy, Award, Lock, Sparkles, CheckCircle2, Calendar } from "lucide-react";
+import { Trophy, Award, Lock, Sparkles, CheckCircle2, Calendar, RotateCcw } from "lucide-react";
 import { catById, unitById, POINTS } from "../lib/constants";
 import { results } from "../lib/helpers";
 import { Cycle } from "../lib/types";
@@ -15,6 +15,8 @@ export interface ResultsViewProps {
   month?: string;
   setMonth?: (m: string) => void;
   monthOptions?: { value: string; label: string }[];
+  currentUser?: any;
+  onNavigateToHr?: () => void;
 }
 
 export const ResultsView: React.FC<ResultsViewProps> = ({
@@ -22,6 +24,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   month,
   setMonth,
   monthOptions,
+  currentUser,
+  onNavigateToHr,
 }) => {
   const isDeclared = cycle.stage === "announced";
   const res = useMemo(() => results(cycle), [cycle]);
@@ -78,6 +82,25 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
         </div>
       </Card>
+
+      {/* Admin Quick Action Banner if Declared */}
+      {isDeclared && (currentUser?.role === "admin" || currentUser?.role === "hr" || currentUser?.isAdmin) && onNavigateToHr && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/80 p-3.5 text-xs text-amber-950 shadow-xs">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-amber-600 shrink-0" />
+            <span>
+              <strong>Admin Notice:</strong> Official results for <strong>{monthLabel}</strong> are published. To adjust scores or revert to normal evaluation, use the HR console controls.
+            </span>
+          </div>
+          <button
+            onClick={onNavigateToHr}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3.5 py-1.5 text-xs font-bold text-rose-800 hover:bg-rose-50 transition shadow-xs shrink-0 active:scale-95 cursor-pointer"
+          >
+            <RotateCcw size={13} className="text-rose-600" />
+            Revert Declared Result (HR Console)
+          </button>
+        </div>
+      )}
 
       {/* Closed State: Result Yet to Be Declared */}
       {!isDeclared ? (

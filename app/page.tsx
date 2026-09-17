@@ -261,6 +261,14 @@ export default function RRAdmin() {
       const saved = await saveCycle(merged);
       if (saved) {
         setCycle(saved);
+        setCycleStatuses((prev) => ({
+          ...prev,
+          [saved.month]: {
+            stage: saved.stage,
+            announcedAt: saved.announcedAt || null,
+            judges: saved.judges || [],
+          },
+        }));
       }
       setErr(null);
     } catch (e) {
@@ -612,6 +620,8 @@ export default function RRAdmin() {
                   month={month}
                   setMonth={setMonth}
                   monthOptions={monthOptions}
+                  currentUser={currentUser}
+                  onNavigateToHr={() => setRole("hr")}
                 />
               )}
               {activeRole === "settings" && (
