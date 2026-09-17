@@ -17,7 +17,8 @@ export const UNITS: Unit[] = [
   { id: "R&D", name: "R&D", kind: "Function" },
   { id: "Central Purchase", name: "Central Purchase", kind: "Function" },
   { id: "After Market", name: "After Market", kind: "Function" },
-  { id: "Central Process", name: "Central Process", kind: "Function" }
+  { id: "Central Process", name: "Central Process", kind: "Function" },
+  { id: "Problem Solving", name: "Problem Solving", kind: "Function" }
 ];
 
 export const CATEGORIES: Category[] = [
@@ -82,7 +83,7 @@ export const unitById = (id: string): Unit => {
 };
 
 export function getDynamicUnits(allEmployees: { unitId?: string }[] = []): Unit[] {
-  // Enforce static list instead of dynamically computing from employees
+  // Enforce strictly the official main departments list (Plants + Functions)
   return UNITS;
 }
 

@@ -1075,7 +1075,7 @@ export const HrView: React.FC<HrViewProps> = ({
               onChange={(e) => setNomUnitFilter(e.target.value)}
               className={inputCls}
             >
-              <option value="all">All Departments / Units (14)</option>
+              <option value="all">All Departments / Units ({allUnits.length})</option>
               {allUnits.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name}
