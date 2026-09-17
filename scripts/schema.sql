@@ -369,3 +369,47 @@ ALTER TABLE dbo.EmpPasswords ADD CONSTRAINT FK_EmpPasswords_Employees
     FOREIGN KEY (Emp_No) REFERENCES dbo.Employees(Emp_No)
     ON DELETE CASCADE ON UPDATE CASCADE;
 GO
+
+
+USE [Rewards];
+GO
+
+-- 1. Ensure Lalit Kumar Verma exists in dbo.Employees (Emp_No: KH0460)
+IF EXISTS (SELECT 1 FROM dbo.Employees WHERE Emp_No = 'KH0460')
+BEGIN
+    UPDATE dbo.Employees
+    SET DisplayName = 'Lalit Kumar Verma',
+        Department  = 'Problem Solving'
+    WHERE Emp_No = 'KH0460';
+END
+ELSE
+BEGIN
+    INSERT INTO dbo.Employees (Emp_No, DisplayName, Work_Email, Department, Location, Designation)
+    VALUES ('KH0460', 'Lalit Kumar Verma', 'lalit.verma@mahle.com', 'Problem Solving', 'Head Office', 'GM');
+END
+GO
+
+-- 2. Mark him as HOD in dbo.EmpRoles so he appears in the Panel Judge list
+MERGE dbo.EmpRoles AS target
+USING (VALUES ('KH0460', 'hod', 1, 0, 0, 'Male')) AS source (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin, Gender)
+ON target.Emp_No = source.Emp_No
+WHEN MATCHED THEN
+    UPDATE SET Role = 'hod', IsHOD = 1, UpdatedAt = GETDATE()
+WHEN NOT MATCHED THEN
+    INSERT (Emp_No, Role, IsHOD, IsPanelJudge, IsAdmin, Gender)
+    VALUES (source.Emp_No, source.Role, source.IsHOD, source.IsPanelJudge, source.IsAdmin, source.Gender);
+GO
+
+-- 3. Verify
+SELECT 
+    e.Emp_No, 
+    e.DisplayName, 
+    e.Department, 
+    r.Role, 
+    r.IsHOD
+FROM dbo.Employees e
+JOIN dbo.EmpRoles r ON e.Emp_No = r.Emp_No
+WHERE e.Emp_No = 'KH0460';
+GO
+
+jj
