@@ -58,9 +58,16 @@ export function isHodEndorsementOpen(cycle: Cycle): boolean {
   const timeline = getCycleTimeline(cycle);
   const hodPhase = timeline.hodEndorsement;
   if (hodPhase.isClosed) return false;
+  // When the admin explicitly extends the deadline, check only the extended date.
+  // When the phase is NOT extended, apply the default date-based auto-close.
+  // This allows reopening after the default end date by extending the deadline.
   const effectiveEnd = getEffectiveEndDate(hodPhase);
   const today = new Date().toISOString().slice(0, 10);
-  return today <= effectiveEnd;
+  if (today <= effectiveEnd) return true;
+  // If today is past the effective end but the phase was explicitly extended,
+  // it means the extension also expired — keep closed.
+  // If the phase was never extended and today > default endDate, auto-close.
+  return false;
 }
 
 export function isPanelScoringOpen(cycle: Cycle): boolean {
@@ -71,6 +78,35 @@ export function isPanelScoringOpen(cycle: Cycle): boolean {
   const effectiveEnd = getEffectiveEndDate(judgePhase);
   const today = new Date().toISOString().slice(0, 10);
   return today <= effectiveEnd;
+}
+
+/**
+ * Determines the correct cycle stage based on today's date and timeline phases.
+ * Returns null if the stage should not be auto-changed (e.g., already "announced").
+ */
+export function getAutoStageFromTimeline(cycle: Cycle): string | null {
+  // Never auto-change away from "announced" — that's a deliberate admin action
+  if (cycle.stage === "announced") return null;
+  const timeline = getCycleTimeline(cycle);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const nomEnd = getEffectiveEndDate(timeline.nomination);
+  const hodEnd = getEffectiveEndDate(timeline.hodEndorsement);
+  const panelEnd = getEffectiveEndDate(timeline.panelScoring);
+
+  // If any phase is manually closed, respect it and skip to the next stage
+  // Phase order: nomination → validation (HOD) → judging (panel)
+  if (today <= nomEnd && !timeline.nomination.isClosed) {
+    return "nomination";
+  }
+  if (today <= hodEnd && !timeline.hodEndorsement.isClosed) {
+    return "validation";
+  }
+  if (today <= panelEnd && !timeline.panelScoring.isClosed) {
+    return "judging";
+  }
+  // All phases have ended — stay at "judging" until admin declares winners
+  return "judging";
 }
 
 export function addDaysToDateStr(dateStr: string, days: number): string {

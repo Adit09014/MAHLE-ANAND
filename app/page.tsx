@@ -27,7 +27,7 @@ import {
   Settings,
 } from "lucide-react";
 import { UNITS, STAGES, POINTS, getDynamicUnits } from "../lib/constants";
-import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
+import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty, getAutoStageFromTimeline } from "../lib/helpers";
 import { loadCycle, saveCycle, loadBranding, loadPoints, loadAllCycleStatuses } from "../lib/storage";
 import { getAuthSession, logoutUser } from "../lib/auth";
 import { Cycle, PointsState, Branding, Role, AuthUser } from "../lib/types";
@@ -168,6 +168,15 @@ export default function RRAdmin() {
       window.removeEventListener("focus", onFocus);
     };
   }, [month, refresh]);
+
+  // Auto-stage: automatically transition cycle stage based on timeline dates
+  useEffect(() => {
+    if (loading) return;
+    const autoStage = getAutoStageFromTimeline(cycle);
+    if (autoStage && autoStage !== cycle.stage) {
+      commit({ ...cycle, stage: autoStage });
+    }
+  }, [cycle.timeline, cycle.stage, loading]);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -562,7 +571,10 @@ export default function RRAdmin() {
                   cycle={cycle}
                   commit={commit}
                   locked={locked}
-                  readOnly={currentUser?.role === "hr" || currentUser?.role === "admin"}
+                  readOnly={
+                    (currentUser?.role === "hr" || currentUser?.role === "admin")
+                    && !(currentUser?.isHOD && asUnit === currentUser?.unitId)
+                  }
                   month={month}
                   setMonth={setMonth}
                   monthOptions={pendingMonthOptions.length > 0 ? pendingMonthOptions : monthOptions}

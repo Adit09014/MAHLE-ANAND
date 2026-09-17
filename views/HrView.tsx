@@ -677,7 +677,11 @@ export const HrView: React.FC<HrViewProps> = ({
     const currentTimeline = getCycleTimeline(cycle);
     const currentPhase = currentTimeline[phaseKey];
     const baseEnd = getEffectiveEndDate(currentPhase);
-    const nextEnd = addDaysToDateStr(baseEnd, days);
+    const today = new Date().toISOString().slice(0, 10);
+    // If the current end date is already in the past, extend from today instead
+    // so the admin can reopen a phase that has expired
+    const effectiveBase = today > baseEnd ? today : baseEnd;
+    const nextEnd = addDaysToDateStr(effectiveBase, days);
     updatePhaseTimeline(phaseKey, {
       isExtended: true,
       extendedUntil: nextEnd,
@@ -968,47 +972,9 @@ export const HrView: React.FC<HrViewProps> = ({
                 </select>
               </div>
             )}
-
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-blue-900/60 block mb-1">
-                Cycle Stage Management ({monthLabel})
-              </span>
-              <div className="flex flex-wrap gap-2">
-              {STAGES.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => handleStageChangeClick(s.id)}
-                  disabled={s.id === "announced"}
-                  className={`rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all duration-150 active:scale-95 ${cycle.stage === s.id
-                      ? "bg-[#0A2540] text-white shadow-md shadow-blue-900/20 ring-2 ring-sky-400"
-                      : "border border-blue-900/15 bg-white text-blue-900/70 hover:border-blue-700 hover:bg-blue-50/50 disabled:opacity-40"
-                    }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-              </div>
-            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {cycle.stage === "judging" ? (
-              <button
-                onClick={() => handleStageChangeClick("validation")}
-                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-rose-700 active:scale-95 transition"
-              >
-                <Scale size={15} /> Close Panel Scoring Page
-              </button>
-            ) : (
-              <button
-                disabled={cycle.stage === "announced"}
-                onClick={() => handleStageChangeClick("judging")}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-emerald-700 disabled:opacity-50 active:scale-95 transition"
-              >
-                <Scale size={15} /> Open Panel Scoring Page
-              </button>
-            )}
-
             <button
               onClick={handleAnnounceClick}
               disabled={cycle.stage === "announced" || pool.length === 0}
