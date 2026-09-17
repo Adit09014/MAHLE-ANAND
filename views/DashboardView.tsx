@@ -19,9 +19,12 @@ import {
   Users,
   Building2,
   Sliders,
+  MessageSquare,
+  MessageSquareQuote,
+  Calendar,
 } from "lucide-react";
 import { catById, unitById, POINTS, STAGES, getMaxCategoriesForUnit, getDynamicUnits } from "../lib/constants";
-import { Cycle, PointsState, AuthUser, Unit } from "../lib/types";
+import { Cycle, PointsState, AuthUser, Unit, Nomination } from "../lib/types";
 import {
   results,
   endorsedList,
@@ -44,6 +47,9 @@ export interface DashboardViewProps {
   onNavigateToEndorse?: () => void;
   onNavigateToJudge?: () => void;
   onNavigateToHr?: () => void;
+  month?: string;
+  setMonth?: (m: string) => void;
+  monthOptions?: { value: string; label: string }[];
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -54,9 +60,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToEndorse,
   onNavigateToJudge,
   onNavigateToHr,
+  month,
+  setMonth,
+  monthOptions,
 }) => {
   const userName = currentUser?.name || "Team Member";
   const userCode = currentUser?.code?.toUpperCase() || "";
+  const cleanUserCode = (currentUser?.code || "").trim().toUpperCase();
+  const cleanUserName = (currentUser?.name || "").trim().toLowerCase();
   const isAdmin = currentUser?.role === "hr" || currentUser?.role === "admin" || Boolean(currentUser?.isAdmin);
   const isHod = currentUser?.role === "hod";
   const isPanelJudge = Boolean(currentUser?.isPanelJudge);
@@ -204,15 +215,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const remainingEndorsements = Math.max(0, maxHodQuota - endorsedCatCount);
 
   // --- EMPLOYEE SPECIFIC CALCULATIONS ---
+  // Nominations submitted by the current user in the active selected recognition cycle
   const userNominations = useMemo(() => {
     if (!cycle?.nominations) return [];
-    if (!userCode) return [];
-    return cycle.nominations.filter(
-      (n) => n.code.toUpperCase() === userCode || (userName && n.name.toLowerCase().trim() === userName.toLowerCase().trim())
-    );
-  }, [cycle?.nominations, userCode, userName]);
+    if (!cleanUserCode && !cleanUserName) return [];
+    return cycle.nominations
+      .filter((n) => {
+        const codeMatch = Boolean(cleanUserCode && n.code && n.code.trim().toUpperCase() === cleanUserCode);
+        const nameMatch = Boolean(cleanUserName && n.name && n.name.trim().toLowerCase() === cleanUserName);
+        return codeMatch || nameMatch;
+      })
+      .map((n) => ({
+        ...n,
+        cycleMonth: cycle.month,
+        isEndorsed: Boolean(cycle.endorsed?.[n.unit]?.[n.category] === n.id),
+      }));
+  }, [cycle?.nominations, cycle?.endorsed, cycle?.month, cleanUserCode, cleanUserName]);
 
-  const userPointRecord = (userCode && points[userCode]) || (userName && points[userName]) || null;
+
+  const userPointRecord = (cleanUserCode && points[cleanUserCode]) || (cleanUserName && points[cleanUserName]) || null;
   const userCumulativePoints = userPointRecord?.points ?? 0;
   const userWinsList = userPointRecord?.wins ?? [];
 
@@ -325,6 +346,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {/* Recognition Cycle Selector Pill */}
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-xs font-semibold backdrop-blur-md shrink-0">
+              <Calendar size={15} className="text-sky-300" />
+              <span className="text-sky-100">Recognition Cycle:</span>
+              {monthOptions && monthOptions.length > 0 && setMonth ? (
+                <select
+                  value={month || cycle.month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="bg-transparent font-bold text-white outline-none cursor-pointer border-b border-white/30 pb-0.5 hover:border-white transition"
+                >
+                  {monthOptions.map((o) => (
+                    <option key={o.value} value={o.value} className="text-blue-950 bg-white font-medium">
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <strong className="text-white">{cycle.month}</strong>
+              )}
+            </div>
+
             {isAdmin && (
               <button
                 onClick={onNavigateToHr || onNavigateToNominate}
@@ -861,6 +903,86 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ))}
             </div>
           </Card>
+
+          {/* Admin's Personal Applied Nominations & HOD Feedback (if any) */}
+          {userNominations.length > 0 && (
+            <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
+              <div className="flex items-center justify-between border-b border-blue-900/10 pb-4 mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-900/10 text-blue-900">
+                    <History size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-blue-950">
+                      My Personal Applied Nominations &amp; HOD Feedback
+                    </h3>
+                    <p className="text-xs text-blue-900/60">
+                      Personal recognition nominations submitted by you and feedback from your Head of Department.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {userNominations.map((nom) => {
+                  const cat = catById(nom.category);
+                  const isEndorsed = Boolean(
+                    nom.isEndorsed ||
+                    cycle.endorsed[nom.unit]?.[nom.category] === nom.id
+                  );
+                  return (
+                    <div
+                      key={nom.id}
+                      className="rounded-xl border border-blue-900/10 bg-blue-950/[0.01] p-4 hover:border-blue-900/20 transition duration-150 space-y-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/5 pb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-900 uppercase">
+                            {cat?.name || nom.category}
+                          </span>
+                          {nom.cycleMonth && (
+                            <span className="rounded bg-blue-900/10 px-2 py-0.5 text-[10px] font-bold text-blue-900">
+                              Cycle: {nom.cycleMonth}
+                            </span>
+                          )}
+                          <h4 className="text-sm font-bold text-blue-950">{nom.name}</h4>
+                          <span className="text-xs font-mono text-blue-900/50">({nom.code})</span>
+                        </div>
+                        <div>
+                          {isEndorsed ? (
+                            <Pill tone="good"><CheckCircle2 size={11} className="inline mr-1" /> HOD Endorsed</Pill>
+                          ) : (
+                            <Pill tone="muted">Submission Received</Pill>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
+                        &ldquo;{nom.citation}&rdquo;
+                      </p>
+
+                      {/* HOD Feedback & Remarks from Endorsement */}
+                      {nom.hodComment && nom.hodComment.trim() && (
+                        <div className="rounded-xl bg-gradient-to-r from-sky-50 via-blue-50/60 to-sky-50 border border-sky-200/80 p-3.5 space-y-1.5 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-sky-950 uppercase tracking-wider">
+                            <MessageSquareQuote size={15} className="text-sky-700 shrink-0" />
+                            <span>HOD Feedback &amp; Remarks</span>
+                          </div>
+                          <p className="text-xs text-blue-950 leading-relaxed font-medium bg-white/95 p-3 rounded-lg border border-sky-100 shadow-2xs whitespace-pre-wrap">
+                            {nom.hodComment}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-[11px] font-mono text-blue-900/50 pt-1">
+                        <span>Unit: {unitById(nom.unit)?.name || nom.unit}</span>
+                        <span>Submitted: {new Date(nom.submittedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </div>
       ) : isHod ? (
         /* HOD SPECIFIC APPLIED NOMINATIONS & DEPT WINS SHOWCASE (Stacked Up-Down) */
@@ -937,6 +1059,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
                         &ldquo;{nom.citation}&rdquo;
                       </p>
+
+                      {nom.hodComment && (
+                        <div className="rounded-lg bg-sky-50/80 border border-sky-200/70 p-2.5 text-xs text-sky-950 space-y-1">
+                          <span className="font-bold text-sky-900 text-[11px] flex items-center gap-1.5">
+                            <MessageSquare size={12} className="text-sky-700" />
+                            HOD Comment:
+                          </span>
+                          <p className="text-xs text-sky-950 leading-relaxed bg-white/80 p-2 rounded border border-sky-100 italic">
+                            &ldquo;{nom.hodComment}&rdquo;
+                          </p>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between text-[11px] font-mono text-blue-900/50 pt-1">
                         <span>Unit: {hodUnitObj?.name || nom.unit}</span>
@@ -1034,10 +1168,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div className="max-w-md mx-auto space-y-1">
                   <h4 className="text-base font-bold text-blue-950">
-                    No recent activity
+                    No activity in {monthOptions?.find((o) => o.value === (month || cycle.month))?.label || cycle.month}
                   </h4>
                   <p className="text-xs text-blue-900/60 leading-relaxed">
-                    You have not submitted a nomination in the active recognition cycle yet. Nominate yourself or a colleague to participate in this month&apos;s recognition awards.
+                    You have not submitted a nomination in this recognition cycle yet. Select another month in the dropdown above to view past entries and HOD comments, or nominate yourself in an open cycle.
                   </p>
                 </div>
                 <div>
@@ -1053,7 +1187,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="space-y-3">
                 {userNominations.map((nom) => {
                   const cat = catById(nom.category);
-                  const isEndorsed = cycle.endorsed[nom.unit]?.[nom.category] === nom.id;
+                  const isEndorsed = Boolean(
+                    nom.isEndorsed ||
+                    cycle.endorsed[nom.unit]?.[nom.category] === nom.id
+                  );
 
                   return (
                     <div
@@ -1061,10 +1198,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       className="rounded-xl border border-blue-900/10 bg-blue-950/[0.01] p-4 hover:border-blue-900/20 transition duration-150 space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-900/5 pb-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-900 uppercase">
                             {cat?.name || nom.category}
                           </span>
+                          {nom.cycleMonth && (
+                            <span className="rounded bg-blue-900/10 px-2 py-0.5 text-[10px] font-bold text-blue-900">
+                              Cycle: {nom.cycleMonth}
+                            </span>
+                          )}
                           <h4 className="text-sm font-bold text-blue-950">
                             {nom.name}
                           </h4>
@@ -1088,6 +1230,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
                         &ldquo;{nom.citation}&rdquo;
                       </p>
+
+                      {/* HOD Feedback & Remarks from Endorsement */}
+                      {nom.hodComment && nom.hodComment.trim() && (
+                        <div className="rounded-xl bg-gradient-to-r from-sky-50 via-blue-50/60 to-sky-50 border border-sky-200/80 p-3.5 space-y-1.5 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-sky-950 uppercase tracking-wider">
+                            <MessageSquareQuote size={15} className="text-sky-700 shrink-0" />
+                            <span>HOD Feedback &amp; Remarks</span>
+                          </div>
+                          <p className="text-xs text-blue-950 leading-relaxed font-medium bg-white/95 p-3 rounded-lg border border-sky-100 shadow-2xs whitespace-pre-wrap">
+                            {nom.hodComment}
+                          </p>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between text-[11px] font-mono text-blue-900/50 pt-1">
                         <span>Unit: {unitById(nom.unit)?.name || nom.unit}</span>

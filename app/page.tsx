@@ -26,6 +26,7 @@ import {
   Bell,
   Settings,
   Users,
+  History,
 } from "lucide-react";
 import { UNITS, STAGES, POINTS, getDynamicUnits } from "../lib/constants";
 import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty, getAutoStageFromTimeline } from "../lib/helpers";
@@ -41,8 +42,10 @@ import HrView from "../views/HrView";
 import ResultsView from "../views/ResultsView";
 import SettingsView from "../views/SettingsView";
 import EmployeesView from "../views/EmployeesView";
+import AppliedDirectoryView from "../views/AppliedDirectoryView";
+import PointsHistoryView from "../views/PointsHistoryView";
 
-export type TabId = "dashboard" | Role | "results" | "settings" | "employees";
+export type TabId = "dashboard" | Role | "results" | "settings" | "employees" | "applied" | "history";
 
 export default function RRAdmin() {
   const router = useRouter();
@@ -212,7 +215,7 @@ export default function RRAdmin() {
           // Keep whichever has the later submittedAt, or the incoming one
           const existTs = new Date(existing.submittedAt || 0).getTime();
           const nextTs = new Date(n.submittedAt || 0).getTime();
-          nomMap.set(n.id, nextTs >= existTs ? n : existing);
+          nomMap.set(n.id, nextTs >= existTs ? { ...existing, ...n } : { ...n, ...existing });
         }
       });
       merged.nominations = Array.from(nomMap.values());
@@ -293,6 +296,8 @@ export default function RRAdmin() {
     { id: "judge", label: "Panel Scoring", icon: Scale },
     { id: "results", label: "Result", icon: Award },
     { id: "hr", label: "HR Console", icon: Trophy },
+    { id: "applied", label: "Applied Directory", icon: UserCheck },
+    { id: "history", label: "Points History", icon: History },
     { id: "employees", label: "Employee Directory", icon: Users },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -326,23 +331,26 @@ export default function RRAdmin() {
   const isPanelJudge = judgeMonthOptions.length > 0;
   const isAdmin = Boolean(currentUser?.isAdmin) || currentUser?.role === "admin";
   const isHOD = Boolean(currentUser?.isHOD) || currentUser?.role === "hod";
+  const isHR = currentUser?.role === "hr";
 
   const allowedRoles: TabId[] = currentUser
     ? isAdmin
       ? isHOD
         ? isPanelJudge
-          ? ["dashboard", "hod", "judge", "results", "hr", "employees", "settings"]
-          : ["dashboard", "hod", "results", "hr", "employees", "settings"]
+          ? ["dashboard", "hod", "judge", "results", "hr", "applied", "history", "employees", "settings"]
+          : ["dashboard", "hod", "results", "hr", "applied", "history", "employees", "settings"]
         : isPanelJudge
-          ? ["dashboard", "employee", "hod", "judge", "results", "hr", "employees", "settings"]
-          : ["dashboard", "employee", "hod", "results", "hr", "employees", "settings"]
-      : isHOD
-        ? isPanelJudge
-          ? ["dashboard", "hod", "judge", "results", "settings"]
-          : ["dashboard", "hod", "results", "settings"]
-        : isPanelJudge
-          ? ["dashboard", "employee", "judge", "results", "settings"]
-          : ["dashboard", "employee", "results", "settings"]
+          ? ["dashboard", "employee", "hod", "judge", "results", "hr", "applied", "history", "employees", "settings"]
+          : ["dashboard", "employee", "hod", "results", "hr", "applied", "history", "employees", "settings"]
+      : isHR
+        ? ["dashboard", "hr", "applied", "history", "results", "settings"]
+        : isHOD
+          ? isPanelJudge
+            ? ["dashboard", "hod", "judge", "results", "settings"]
+            : ["dashboard", "hod", "results", "settings"]
+          : isPanelJudge
+            ? ["dashboard", "employee", "judge", "results", "settings"]
+            : ["dashboard", "employee", "results", "settings"]
     : ["dashboard", "employee", "results", "settings"];
 
   const visibleTabs = allTabs.filter((t) => allowedRoles.includes(t.id));
@@ -563,6 +571,9 @@ export default function RRAdmin() {
                   onNavigateToEndorse={() => setRole("hod")}
                   onNavigateToJudge={() => setRole("judge")}
                   onNavigateToHr={() => setRole("hr")}
+                  month={month}
+                  setMonth={setMonth}
+                  monthOptions={monthOptions}
                 />
               )}
               {activeRole === "employee" && (
@@ -616,10 +627,29 @@ export default function RRAdmin() {
                   setMonth={setMonth}
                   monthOptions={monthOptions}
                   onNavigateToEmployees={isAdmin ? () => setRole("employees") : undefined}
+                  onNavigateToApplied={() => setRole("applied")}
+                  onNavigateToHistory={() => setRole("history")}
                 />
               )}
               {activeRole === "employees" && isAdmin && (
                 <EmployeesView currentUser={currentUser} />
+              )}
+              {activeRole === "applied" && (isAdmin || isHR) && (
+                <AppliedDirectoryView
+                  currentUser={currentUser}
+                  month={month}
+                  setMonth={setMonth}
+                  monthOptions={monthOptions}
+                  cycle={cycle}
+                  onNavigateToNominate={() => setRole("employee")}
+                />
+              )}
+              {activeRole === "history" && (isAdmin || isHR) && (
+                <PointsHistoryView
+                  currentUser={currentUser}
+                  points={points}
+                  setPoints={setPoints}
+                />
               )}
               {activeRole === "results" && (
                 <ResultsView

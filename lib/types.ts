@@ -42,6 +42,7 @@ export interface Nomination {
   submittedAt: string;
   validated: boolean | null;
   hrNote?: string;
+  hodComment?: string;
 }
 
 export interface PhaseTimeline {
@@ -96,6 +97,7 @@ export interface AuthUser {
   role: Role;
   name: string;
   code?: string;
+  email?: string;
   unitId?: string;
   designation?: string;
   judgeId?: string;
@@ -125,5 +127,19 @@ export interface CategoryResult {
   category: Category;
   slotLabel: string | null;
   ranked: RankedNominee[];
+}
+
+export interface EmployeeRecord {
+  code: string;
+  name: string;
+  unitId: string;
+  designation?: string;
+  location?: string;
+  role?: string;
+  isHOD?: boolean;
+  isPanelJudge?: boolean;
+  isAdmin?: boolean;
+  gender?: string;
+  email?: string;
 }
 

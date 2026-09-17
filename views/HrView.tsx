@@ -10,6 +10,7 @@ import {
   RotateCcw,
   User,
   Users,
+  UserCheck,
   Edit3,
   Search,
   Key,
@@ -29,6 +30,7 @@ import {
   FileText,
   Eye,
   Building2,
+  History,
 } from "lucide-react";
 import { STAGES, PANEL_SIZE, POINTS, UNITS, CATEGORIES, catById, unitById, getDynamicUnits } from "../lib/constants";
 import {
@@ -93,6 +95,8 @@ export interface HrViewProps {
   setMonth?: (m: string) => void;
   monthOptions?: { value: string; label: string }[];
   onNavigateToEmployees?: () => void;
+  onNavigateToApplied?: () => void;
+  onNavigateToHistory?: () => void;
 }
 
 export const HrView: React.FC<HrViewProps> = ({
@@ -107,6 +111,8 @@ export const HrView: React.FC<HrViewProps> = ({
   setMonth,
   monthOptions,
   onNavigateToEmployees,
+  onNavigateToApplied,
+  onNavigateToHistory,
 }) => {
   const [logoDraft, setLogoDraft] = useState(brand.logoUrl || "");
   const [logoSaved, setLogoSaved] = useState(false);
@@ -342,35 +348,7 @@ export const HrView: React.FC<HrViewProps> = ({
 
   const allUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
 
-  // All Monthly Nominations Table & Details Modal States
-  const [nomSearch, setNomSearch] = useState("");
-  const [nomUnitFilter, setNomUnitFilter] = useState("all");
-  const [nomCategoryFilter, setNomCategoryFilter] = useState("all");
-  const [nomStatusFilter, setNomStatusFilter] = useState("all");
-  const [selectedNomDetail, setSelectedNomDetail] = useState<Nomination | null>(null);
 
-  const filteredCompanyNominations = useMemo(() => {
-    if (!cycle?.nominations) return [];
-    return cycle.nominations.filter((n) => {
-      const matchesSearch =
-        !nomSearch.trim() ||
-        n.name.toLowerCase().includes(nomSearch.toLowerCase()) ||
-        n.code.toLowerCase().includes(nomSearch.toLowerCase()) ||
-        (n.citation || "").toLowerCase().includes(nomSearch.toLowerCase()) ||
-        (n.businessImpact || "").toLowerCase().includes(nomSearch.toLowerCase());
-
-      const matchesUnit = nomUnitFilter === "all" || n.unit === nomUnitFilter;
-      const matchesCategory = nomCategoryFilter === "all" || n.category === nomCategoryFilter;
-
-      const isEndorsed = cycle.endorsed[n.unit]?.[n.category] === n.id;
-      const matchesStatus =
-        nomStatusFilter === "all" ||
-        (nomStatusFilter === "endorsed" && isEndorsed) ||
-        (nomStatusFilter === "pending" && !isEndorsed);
-
-      return matchesSearch && matchesUnit && matchesCategory && matchesStatus;
-    });
-  }, [cycle?.nominations, cycle?.endorsed, nomSearch, nomUnitFilter, nomCategoryFilter, nomStatusFilter]);
 
   const exportNominationsCsv = () => {
     const rows: string[][] = [
@@ -900,201 +878,7 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       </Card>
 
-      {/* 3. All Company Nominations Directory for the Month */}
-      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-900/10 pb-4">
-          <div>
-            <h3 className="text-base font-bold text-blue-950 flex items-center gap-2">
-              <ClipboardList size={18} className="text-blue-700" />
-              All Company Self-Nominations ({monthLabel})
-            </h3>
-            <p className="mt-1 text-xs text-blue-900/60">
-              Complete company-wide repository of all employee nominations submitted for the {monthLabel} recognition cycle across all 14 units.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-blue-900/10 px-3 py-1 text-xs font-bold text-blue-950">
-              {cycle.nominations.length} Total {cycle.nominations.length === 1 ? "Nomination" : "Nominations"}
-            </span>
-            <span className="rounded-full bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-bold text-emerald-900">
-              {pool.length} HOD Endorsed
-            </span>
-            <button
-              onClick={exportNominationsCsv}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/15 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900 hover:bg-blue-100 transition shadow-2xs active:scale-95"
-            >
-              <Download size={13} /> Export CSV
-            </button>
-          </div>
-        </div>
 
-        {/* Filter & Search Toolbar */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-1">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-3 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search candidate name, code, citation..."
-              value={nomSearch}
-              onChange={(e) => setNomSearch(e.target.value)}
-              className="w-full rounded-xl border border-blue-900/15 bg-white pl-9 pr-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 shadow-xs"
-            />
-          </div>
-
-          <div>
-            <select
-              value={nomUnitFilter}
-              onChange={(e) => setNomUnitFilter(e.target.value)}
-              className={inputCls}
-            >
-              <option value="all">All Departments / Units ({allUnits.length})</option>
-              {allUnits.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <select
-              value={nomCategoryFilter}
-              onChange={(e) => setNomCategoryFilter(e.target.value)}
-              className={inputCls}
-            >
-              <option value="all">All Award Categories (7)</option>
-              {CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <select
-              value={nomStatusFilter}
-              onChange={(e) => setNomStatusFilter(e.target.value)}
-              className={inputCls}
-            >
-              <option value="all">All Endorsement Statuses</option>
-              <option value="endorsed">HOD Endorsed Only</option>
-              <option value="pending">Submitted / Pending Endorsement</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Table of Nominations */}
-        <div className="overflow-x-auto rounded-xl border border-blue-900/10">
-          <table className="w-full text-xs">
-            <thead className="bg-blue-900/5 text-blue-900/70 font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="px-4 py-3 text-left">Employee Name &amp; Code</th>
-                <th className="px-4 py-3 text-left">Department / Unit</th>
-                <th className="px-4 py-3 text-left">Award Category</th>
-                <th className="px-4 py-3 text-left">MAFS Value</th>
-                <th className="px-4 py-3 text-left">Location</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Panel Score</th>
-                <th className="px-4 py-3 text-right">Citation Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-blue-900/10 bg-white">
-              {filteredCompanyNominations.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-xs text-slate-400 italic">
-                    {cycle.nominations.length === 0
-                      ? `No self-nominations have been submitted for ${monthLabel} yet.`
-                      : "No nominations match your search/filter criteria."}
-                  </td>
-                </tr>
-              ) : (
-                filteredCompanyNominations.map((nom) => {
-                  const isEndorsed = cycle.endorsed[nom.unit]?.[nom.category] === nom.id;
-                  const unitObj = unitById(nom.unit);
-                  const catObj = catById(nom.category);
-                  const pScore = panelScore(cycle, nom.id);
-
-                  return (
-                    <tr key={nom.id} className="hover:bg-blue-50/40 transition">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-900/10 text-blue-950 font-bold text-xs uppercase">
-                            {nom.name.charAt(0)}
-                          </div>
-                          <div>
-                            <strong className="block text-xs font-bold text-blue-950">
-                              {nom.name}
-                            </strong>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {nom.code} {nom.gender ? `• ${nom.gender}` : ""}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 font-semibold text-blue-950">
-                        {unitObj?.name || nom.unit}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span className="inline-block rounded-md bg-sky-50 border border-sky-200/60 px-2 py-0.5 text-[11px] font-bold text-sky-950">
-                          {catObj?.name || nom.category}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 text-blue-900/70 font-medium">
-                        {nom.mafsValue || "—"}
-                      </td>
-
-                      <td className="px-4 py-3 text-blue-900/70">
-                        <span>{nom.location || "—"}</span>
-                        {nom.targetHod && (
-                          <span className="block text-[10px] text-slate-400 font-mono">
-                            HOD: {nom.targetHod}
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        {isEndorsed ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-300 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
-                            <CheckCircle2 size={11} className="text-emerald-600" /> HOD Endorsed
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                            Submitted
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 font-mono">
-                        {pScore.avg !== null ? (
-                          <span className="font-extrabold text-blue-950 text-xs">
-                            {pScore.avg.toFixed(1)} <span className="text-[10px] text-slate-400">({pScore.count}/3)</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">Not Scored</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => setSelectedNomDetail(nom)}
-                          className="inline-flex items-center gap-1 rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-900 hover:text-white transition shadow-2xs active:scale-95"
-                          title="View Full Citation & Submission Details"
-                        >
-                          <Eye size={13} /> View Citation
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
 
       {/* 4. Admin Timeline & Date Extension Management */}
       <Card className="p-6 border border-blue-900/10 shadow-sm bg-white">
@@ -1492,6 +1276,16 @@ export const HrView: React.FC<HrViewProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {onNavigateToHistory && (
+              <button
+                onClick={onNavigateToHistory}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/20 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-950 hover:bg-blue-100 transition shadow-xs active:scale-95 cursor-pointer"
+                title="Open dedicated Points History page with Year/Month and Date Range filtering"
+              >
+                <History size={13} className="text-blue-700" />
+                <span>Date-Filtered History</span>
+              </button>
+            )}
             {cycle.stage === "announced" && (
               <button
                 onClick={syncLedgerFromCurrentCycle}
@@ -1853,119 +1647,7 @@ export const HrView: React.FC<HrViewProps> = ({
         </div>
       )}
 
-      {/* View Full Citation & Nomination Details Modal */}
-      {selectedNomDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 text-blue-950">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-900 text-white font-extrabold text-lg">
-                  {selectedNomDetail.name.charAt(0)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base font-extrabold text-blue-950">
-                      {selectedNomDetail.name}
-                    </h3>
-                    <span className="rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-mono font-bold text-blue-900 uppercase">
-                      {selectedNomDetail.code}
-                    </span>
-                    {cycle.endorsed[selectedNomDetail.unit]?.[selectedNomDetail.category] === selectedNomDetail.id ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[10px] font-bold text-emerald-900">
-                        <CheckCircle2 size={11} /> HOD Endorsed
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                        Submitted (Pending Endorsement)
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {unitById(selectedNomDetail.unit)?.name || selectedNomDetail.unit} • {catById(selectedNomDetail.category)?.name || selectedNomDetail.category}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedNomDetail(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            {/* Quick Metadata Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200/60 text-xs">
-              <div>
-                <span className="block text-[10px] font-bold uppercase text-slate-400">Award Category</span>
-                <strong className="text-blue-950 font-bold">{catById(selectedNomDetail.category)?.name}</strong>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase text-slate-400">Department</span>
-                <strong className="text-blue-950 font-bold">{unitById(selectedNomDetail.unit)?.name || selectedNomDetail.unit}</strong>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase text-slate-400">Location</span>
-                <strong className="text-blue-950 font-bold">{selectedNomDetail.location || "Not Specified"}</strong>
-              </div>
-              <div>
-                <span className="block text-[10px] font-bold uppercase text-slate-400">Submission Date</span>
-                <strong className="text-blue-950 font-bold">
-                  {selectedNomDetail.submittedAt ? new Date(selectedNomDetail.submittedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }) : "—"}
-                </strong>
-              </div>
-            </div>
-
-            {selectedNomDetail.mafsValue && (
-              <div className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200/80 p-3 text-xs text-sky-950">
-                <Sparkles size={16} className="text-sky-600 shrink-0" />
-                <span>
-                  <strong>MAFS Value Demonstrated:</strong> {selectedNomDetail.mafsValue}
-                </span>
-              </div>
-            )}
-
-            {/* Citation Details Box */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Projects Undertaken / Key Contribution</Label>
-                <span className="text-[10px] font-mono text-slate-400">
-                  {selectedNomDetail.citation.trim().split(/\s+/).filter(Boolean).length} words
-                </span>
-              </div>
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-blue-950 whitespace-pre-wrap leading-relaxed">
-                {selectedNomDetail.citation || "No citation entered."}
-              </div>
-            </div>
-
-            {/* Business Impact Box */}
-            {selectedNomDetail.businessImpact && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Business Impact</Label>
-                  <span className="text-[10px] font-mono text-slate-400">
-                    {selectedNomDetail.businessImpact.trim().split(/\s+/).filter(Boolean).length} words
-                  </span>
-                </div>
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs text-blue-950 whitespace-pre-wrap leading-relaxed">
-                  {selectedNomDetail.businessImpact}
-                </div>
-              </div>
-            )}
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setSelectedNomDetail(null)}
-                className="rounded-xl bg-blue-900 px-5 py-2 text-xs font-bold text-white hover:bg-blue-800 transition"
-              >
-                Close Details
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

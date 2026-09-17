@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Lock, Clock, Calendar, CheckCircle2, ShieldAlert, FileText, Check, Edit3, X } from "lucide-react";
+import { Lock, Clock, Calendar, CheckCircle2, ShieldAlert, FileText, Check, Edit3, X, MessageSquare } from "lucide-react";
 import { UNITS, CATEGORIES, catById, unitById, getDynamicUnits } from "../lib/constants";
 import { AuthUser, Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty, isNominationOpen } from "../lib/helpers";
@@ -271,6 +271,16 @@ export const NominateView: React.FC<NominateViewProps> = ({
         text: "Employee of the Month is declared for a male and female winner — please select gender.",
       });
 
+    let targetUnit = unit;
+    if (f.location === "Head Office(H.O)") {
+      const hodEmp = hodList.find((h) => h.code === f.targetHod);
+      if (hodEmp && hodEmp.unitId) {
+        targetUnit = hodEmp.unitId;
+      }
+    } else if (f.location) {
+      targetUnit = f.location;
+    }
+
     if (!editingNomId) {
       // Check duplicate category ONLY when creating a new nomination
       if (userNominations.some((n) => n.category === f.category))
@@ -278,6 +288,14 @@ export const NominateView: React.FC<NominateViewProps> = ({
           bad: true,
           text: `You have already filed a nomination under '${cat?.name}' for this month. You may edit your existing entry or nominate yourself in other categories.`,
         });
+    } else {
+      // When editing and changing category, verify no other entry exists in target category
+      if (userNominations.some((n) => n.id !== editingNomId && n.category === f.category)) {
+        return setMsg({
+          bad: true,
+          text: `You have already filed another nomination under '${cat?.name}' for this month.`,
+        });
+      }
     }
 
     if (editingNomId) {
@@ -286,6 +304,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
         if (n.id === editingNomId) {
           return {
             ...n,
+            unit: targetUnit,
             category: f.category,
             gender: cat?.splitByGender ? f.gender : "",
             citation: f.citation.trim(),
@@ -309,7 +328,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
         id: `${code}-${f.category}-${Date.now()}`,
         name,
         code,
-        unit,
+        unit: targetUnit,
         category: f.category,
         gender: cat?.splitByGender ? f.gender : "",
         citation: f.citation.trim(),
@@ -345,7 +364,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
             </h2>
             <p className="mt-0.5 text-xs text-blue-900/60">
               {editingNomId
-                ? "Modify your submitted citation and business impact details below."
+                ? "Modify your nomination details (Location, Target HOD, Category, MAFS values, Citation, Impact) below."
                 : "Auto-filled profile details. You can nominate yourself across multiple categories."}
             </p>
           </div>
@@ -405,30 +424,30 @@ export const NominateView: React.FC<NominateViewProps> = ({
             </select>
           </Field>
 
-          {/* Profile Auto-filled locked fields */}
-          <Field label="Employee Name (Auto-Filled)">
+          {/* Profile Auto-filled locked fields - strictly static */}
+          <Field label="Employee Name (Auto-Filled - Static)">
             <input
               className={readOnlyCls}
               value={f.name}
               readOnly
               disabled
-              title="Locked to your registered profile"
+              title="Locked to your registered profile (Static)"
             />
           </Field>
-          <Field label="Employee Code (Auto-Filled)">
+          <Field label="Employee Code (Auto-Filled - Static)">
             <input
               className={`${readOnlyCls} font-mono uppercase`}
               value={f.code}
               readOnly
               disabled
-              title="Locked to your registered profile"
+              title="Locked to your registered profile (Static)"
             />
           </Field>
           <Field label="Location">
             <select
               className={inputCls}
               value={f.location}
-              disabled={!open || Boolean(editingNomId)}
+              disabled={!open}
               onChange={(e) => set("location", e.target.value)}
             >
               <option value="">Select Location</option>
@@ -444,7 +463,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
               <select
                 className={inputCls}
                 value={f.targetHod}
-                disabled={!open || Boolean(editingNomId)}
+                disabled={!open}
                 onChange={(e) => set("targetHod", e.target.value)}
               >
                 <option value="">Select HOD</option>
@@ -461,7 +480,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
             <select
               className={inputCls}
               value={f.category}
-              disabled={!open || Boolean(editingNomId)}
+              disabled={!open}
               onChange={(e) => set("category", e.target.value)}
             >
               {CATEGORIES.map((c) => (
@@ -574,7 +593,7 @@ export const NominateView: React.FC<NominateViewProps> = ({
 
         <div className="mt-5 flex items-center gap-3">
           <Button onClick={submit} disabled={!open}>
-            {editingNomId ? "Save & Update Citation" : "Submit Self-Nomination"}
+            {editingNomId ? "Save & Update Nomination" : "Submit Self-Nomination"}
           </Button>
           {editingNomId && (
             <button
@@ -646,10 +665,10 @@ export const NominateView: React.FC<NominateViewProps> = ({
                             type="button"
                             onClick={() => handleStartEdit(n)}
                             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-blue-900/20"
-                            title="Edit Citation & Impact details"
+                            title="Edit nomination details"
                           >
                             <Edit3 size={12} className="text-blue-700" />
-                            <span>Edit Citation</span>
+                            <span>Edit Nomination</span>
                           </button>
                         )}
                         {isEndorsed ? (
@@ -685,6 +704,19 @@ export const NominateView: React.FC<NominateViewProps> = ({
                         </div>
                       )}
                     </div>
+
+                    {/* HOD Feedback & Remarks if present */}
+                    {n.hodComment && (
+                      <div className="rounded-xl bg-gradient-to-r from-sky-50 via-blue-50/60 to-sky-50 border border-sky-200/80 p-3 space-y-1 shadow-2xs">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-sky-950 uppercase tracking-wider">
+                          <MessageSquare size={13} className="text-sky-700 shrink-0" />
+                          <span>HOD Feedback &amp; Remarks</span>
+                        </div>
+                        <p className="text-xs text-blue-950 leading-relaxed font-medium bg-white/95 p-2.5 rounded-lg border border-sky-100 shadow-2xs">
+                          {n.hodComment}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1">
                       <span>Unit: {unitById(n.unit)?.name || n.unit}</span>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye, Sparkles } from "lucide-react";
+import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye, Sparkles, MessageSquare, Save, Check } from "lucide-react";
 import { unitById, CATEGORIES, getMaxCategoriesForUnit, STAGES } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty, isHodEndorsementOpen } from "../lib/helpers";
@@ -22,11 +22,11 @@ export interface HodViewProps {
   monthOptions?: { value: string; label: string }[];
 }
 
-export const HodView: React.FC<HodViewProps> = ({ 
-  cycle, 
-  commit, 
-  unitId, 
-  locked, 
+export const HodView: React.FC<HodViewProps> = ({
+  cycle,
+  commit,
+  unitId,
+  locked,
   readOnly = false,
   month,
   setMonth,
@@ -117,6 +117,28 @@ export const HodView: React.FC<HodViewProps> = ({
   const effectiveEnd = getEffectiveEndDate(hodPhase);
   const open = !locked && isHodEndorsementOpen(cycle);
 
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const handleSaveComment = (nom: Nomination) => {
+    if (readOnly) return;
+    setSavingId(nom.id);
+    const draft = commentDrafts[nom.id] !== undefined ? commentDrafts[nom.id] : (nom.hodComment || "");
+    const nextNoms = (cycle.nominations || []).map((item) =>
+      item.id === nom.id ? { ...item, hodComment: draft.trim() } : item
+    );
+    commit({
+      ...cycle,
+      nominations: nextNoms,
+    });
+    setSavingId(null);
+    setSavedStatus((prev) => ({ ...prev, [nom.id]: true }));
+    setTimeout(() => {
+      setSavedStatus((prev) => ({ ...prev, [nom.id]: false }));
+    }, 2500);
+  };
+
   const toggle = (nom: Nomination) => {
     if (readOnly || !open) return;
     const next = { ...picks };
@@ -127,8 +149,15 @@ export const HodView: React.FC<HodViewProps> = ({
         return;
       next[nom.category] = nom.id; // Enforces 1 employee per category
     }
+    const currentDraft = commentDrafts[nom.id];
     const nextNoms = (cycle.nominations || []).map((n) =>
-      n.id === nom.id ? { ...n, unit: unitId } : n
+      n.id === nom.id
+        ? {
+            ...n,
+            unit: unitId,
+            ...(currentDraft !== undefined ? { hodComment: currentDraft.trim() } : {}),
+          }
+        : n
     );
     commit({
       ...cycle,
@@ -326,6 +355,66 @@ export const HodView: React.FC<HodViewProps> = ({
                         >
                           {isPick ? "Withdraw endorsement" : "Endorse"}
                         </Button>
+                      )}
+                    </div>
+
+                    {/* HOD Feedback & Remarks Section */}
+                    <div className="mt-4 pt-3.5 border-t border-blue-900/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-blue-950 uppercase tracking-wider">
+                          <MessageSquare size={13} className="text-sky-700" />
+                          <span>HOD Comment / Feedback</span>
+                        </label>
+                        {savedStatus[n.id] && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+                            <Check size={12} /> Saved!
+                          </span>
+                        )}
+                      </div>
+
+                      {readOnly ? (
+                        n.hodComment ? (
+                          <div className="rounded-lg bg-sky-50 border border-sky-200/80 p-2.5 text-xs text-sky-950 leading-relaxed">
+                            <p className="italic font-medium">&ldquo;{n.hodComment}&rdquo;</p>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-blue-900/40 italic">
+                            No HOD comments added.
+                          </p>
+                        )
+                      ) : (
+                        <div className="space-y-2">
+                          <textarea
+                            rows={2}
+                            value={commentDrafts[n.id] !== undefined ? commentDrafts[n.id] : (n.hodComment || "")}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCommentDrafts((prev) => ({ ...prev, [n.id]: val }));
+                              setSavedStatus((prev) => ({ ...prev, [n.id]: false }));
+                            }}
+                            placeholder="Add comments or feedback for this employee (shown on their dashboard)..."
+                            className="w-full resize-none rounded-xl border border-blue-900/15 bg-white p-2.5 text-xs text-blue-950 placeholder:text-blue-900/35 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100 transition shadow-inner"
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-blue-900/55 leading-tight">
+                              Visible directly to {n.name.split(" ")[0]} on their personal dashboard.
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveComment(n)}
+                              disabled={savingId === n.id}
+                              className="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-gradient-to-r from-[#0A2540] to-blue-900 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:from-blue-900 hover:to-sky-900 active:scale-95 transition disabled:opacity-50 cursor-pointer"
+                            >
+                              <Save size={12} />
+                              <span>{savingId === n.id ? "Saving..." : "Save Comment"}</span>
+                            </button>
+                          </div>
+                          {n.hodComment && !savedStatus[n.id] && (
+                            <p className="text-[10px] text-emerald-800 font-medium truncate">
+                              Current: &ldquo;{n.hodComment}&rdquo;
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </Card>

@@ -118,6 +118,7 @@ export async function POST(request: Request) {
       role: userRole,
       name: empName,
       code: empCode,
+      email: String(row.Work_Email || "").trim(),
       unitId: String(row.Department || "").trim(),
       designation:
         String(row.Designation || "").trim() ||

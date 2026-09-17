@@ -89,9 +89,9 @@ export async function POST(
       const incomingNom = nomMap.get(n.id);
       if (incomingNom) {
         nomMap.set(n.id, {
-          ...incomingNom,
           ...n,
-          unit: n.unit && n.unit !== "hr" ? n.unit : incomingNom.unit || n.unit,
+          ...incomingNom,
+          unit: incomingNom.unit && incomingNom.unit !== "hr" ? incomingNom.unit : n.unit || incomingNom.unit,
         });
       } else {
         nomMap.set(n.id, n);
