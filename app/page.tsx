@@ -25,6 +25,7 @@ import {
   Menu,
   Bell,
   Settings,
+  Users,
 } from "lucide-react";
 import { UNITS, STAGES, POINTS, getDynamicUnits } from "../lib/constants";
 import { emptyCycle, getCycleTimeline, getEffectiveEndDate, formatDatePretty, getAutoStageFromTimeline } from "../lib/helpers";
@@ -39,8 +40,9 @@ import JudgeView from "../views/JudgeView";
 import HrView from "../views/HrView";
 import ResultsView from "../views/ResultsView";
 import SettingsView from "../views/SettingsView";
+import EmployeesView from "../views/EmployeesView";
 
-export type TabId = "dashboard" | Role | "results" | "settings";
+export type TabId = "dashboard" | Role | "results" | "settings" | "employees";
 
 export default function RRAdmin() {
   const router = useRouter();
@@ -291,6 +293,7 @@ export default function RRAdmin() {
     { id: "judge", label: "Panel Scoring", icon: Scale },
     { id: "results", label: "Result", icon: Award },
     { id: "hr", label: "HR Console", icon: Trophy },
+    { id: "employees", label: "Employee Directory", icon: Users },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -328,11 +331,11 @@ export default function RRAdmin() {
     ? isAdmin
       ? isHOD
         ? isPanelJudge
-          ? ["dashboard", "hod", "judge", "results", "hr", "settings"]
-          : ["dashboard", "hod", "results", "hr", "settings"]
+          ? ["dashboard", "hod", "judge", "results", "hr", "employees", "settings"]
+          : ["dashboard", "hod", "results", "hr", "employees", "settings"]
         : isPanelJudge
-          ? ["dashboard", "employee", "hod", "judge", "results", "hr", "settings"]
-          : ["dashboard", "employee", "hod", "results", "hr", "settings"]
+          ? ["dashboard", "employee", "hod", "judge", "results", "hr", "employees", "settings"]
+          : ["dashboard", "employee", "hod", "results", "hr", "employees", "settings"]
       : isHOD
         ? isPanelJudge
           ? ["dashboard", "hod", "judge", "results", "settings"]
@@ -612,7 +615,11 @@ export default function RRAdmin() {
                   month={month}
                   setMonth={setMonth}
                   monthOptions={monthOptions}
+                  onNavigateToEmployees={isAdmin ? () => setRole("employees") : undefined}
                 />
+              )}
+              {activeRole === "employees" && isAdmin && (
+                <EmployeesView currentUser={currentUser} />
               )}
               {activeRole === "results" && (
                 <ResultsView
