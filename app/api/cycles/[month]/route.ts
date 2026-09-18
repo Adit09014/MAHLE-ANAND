@@ -98,6 +98,19 @@ export async function POST(
       }
     });
     const mergedNominations = Array.from(nomMap.values());
+    // Server-side validation: enforce max 2 categories per employee per month
+    const categoryCountByCode: Record<string, Set<string>> = {};
+    mergedNominations.forEach((n) => {
+      if (!categoryCountByCode[n.code]) {
+        categoryCountByCode[n.code] = new Set();
+      }
+      categoryCountByCode[n.code].add(n.category);
+    });
+    for (const code in categoryCountByCode) {
+      if (categoryCountByCode[code].size > 2) {
+        return NextResponse.json({ error: `Employee ${code} has nominations in more than 2 categories this month.` }, { status: 400 });
+      }
+    }
 
     // Preserve scores by nomination ID and judge ID, process -1 as a deletion signal
     const mergedScores: Record<string, Record<string, number>> = {

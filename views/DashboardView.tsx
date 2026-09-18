@@ -22,6 +22,7 @@ import {
   MessageSquare,
   MessageSquareQuote,
   Calendar,
+  ExternalLink,
 } from "lucide-react";
 import { catById, unitById, POINTS, STAGES, getMaxCategoriesForUnit, getDynamicUnits } from "../lib/constants";
 import { Cycle, PointsState, AuthUser, Unit, Nomination } from "../lib/types";
@@ -956,9 +957,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </div>
                       </div>
 
-                      <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
-                        &ldquo;{nom.citation}&rdquo;
-                      </p>
+                      {nom.mafsValue && (
+                        <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-950">
+                          <Sparkles size={12} className="text-amber-600 shrink-0" />
+                          <span>MAFS Value: {nom.mafsValue}</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Projects Undertaken / Citation:
+                        </span>
+                        <p className="text-xs text-blue-950/90 leading-relaxed font-sans bg-white p-2.5 rounded-lg border border-blue-900/10 whitespace-pre-wrap">
+                          {nom.citation}
+                        </p>
+                      </div>
+
+                      {nom.businessImpact && (
+                        <div className="space-y-1">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                            Business Impact &amp; Measurable Outcome:
+                          </span>
+                          <p className="text-xs text-emerald-950/90 leading-relaxed font-sans bg-emerald-50/40 p-2.5 rounded-lg border border-emerald-900/10 whitespace-pre-wrap">
+                            {nom.businessImpact}
+                          </p>
+                        </div>
+                      )}
 
                       {/* HOD Feedback & Remarks from Endorsement */}
                       {nom.hodComment && nom.hodComment.trim() && (
@@ -1056,9 +1080,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </div>
                       </div>
 
-                      <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
-                        &ldquo;{nom.citation}&rdquo;
-                      </p>
+                      {nom.mafsValue && (
+                        <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-950">
+                          <Sparkles size={12} className="text-amber-600 shrink-0" />
+                          <span>MAFS Value: {nom.mafsValue}</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Projects Undertaken / Citation:
+                        </span>
+                        <p className="text-xs text-blue-950/90 leading-relaxed font-sans bg-white p-2.5 rounded-lg border border-blue-900/10 whitespace-pre-wrap">
+                          {nom.citation}
+                        </p>
+                      </div>
+
+                      {nom.businessImpact && (
+                        <div className="space-y-1">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                            Business Impact &amp; Measurable Outcome:
+                          </span>
+                          <p className="text-xs text-emerald-950/90 leading-relaxed font-sans bg-emerald-50/40 p-2.5 rounded-lg border border-emerald-900/10 whitespace-pre-wrap">
+                            {nom.businessImpact}
+                          </p>
+                        </div>
+                      )}
+
+                      {nom.evidence && (
+                        <div className="flex items-center gap-1.5 text-xs text-sky-800">
+                          <ExternalLink size={12} className="text-sky-600 shrink-0" />
+                          <a
+                            href={nom.evidence.startsWith("http") ? nom.evidence : `https://${nom.evidence}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium hover:underline break-all truncate text-[11px]"
+                          >
+                            Supporting Evidence Document
+                          </a>
+                        </div>
+                      )}
 
                       {nom.hodComment && (
                         <div className="rounded-lg bg-sky-50/80 border border-sky-200/70 p-2.5 text-xs text-sky-950 space-y-1">
@@ -1227,9 +1288,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </div>
                       </div>
 
-                      <p className="text-xs text-blue-900/80 line-clamp-2 italic bg-white p-2.5 rounded-lg border border-blue-900/5">
-                        &ldquo;{nom.citation}&rdquo;
-                      </p>
+                      {nom.mafsValue && (
+                        <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[11px] font-bold text-amber-950">
+                          <Sparkles size={12} className="text-amber-600 shrink-0" />
+                          <span>MAFS: {nom.mafsValue}</span>
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Citation &amp; Contribution:
+                        </span>
+                        <p className="text-xs text-blue-950/90 leading-relaxed font-sans bg-white p-2.5 rounded-lg border border-blue-900/10 whitespace-pre-wrap">
+                          {nom.citation}
+                        </p>
+                      </div>
+
+                      {nom.businessImpact && (
+                        <div className="space-y-1">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                            Business Impact:
+                          </span>
+                          <p className="text-xs text-emerald-950/90 leading-relaxed font-sans bg-emerald-50/40 p-2.5 rounded-lg border border-emerald-900/10 whitespace-pre-wrap">
+                            {nom.businessImpact}
+                          </p>
+                        </div>
+                      )}
 
                       {/* HOD Feedback & Remarks from Endorsement */}
                       {nom.hodComment && nom.hodComment.trim() && (

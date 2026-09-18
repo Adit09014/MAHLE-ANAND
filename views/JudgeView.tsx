@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Lock, Clock, Calendar, Search, Filter, Scale, CheckCircle2, User, Award, FileText, Sparkles, Star, ChevronRight, Check } from "lucide-react";
+import { Lock, Clock, Calendar, Search, Filter, Scale, CheckCircle2, User, Award, FileText, Sparkles, Star, ChevronRight, Check, Eye, ExternalLink, X, MessageSquare } from "lucide-react";
 import { CATEGORIES, catById, unitById } from "../lib/constants";
 import { endorsedList, getCycleTimeline, getEffectiveEndDate, formatDatePretty, isPanelScoringOpen } from "../lib/helpers";
-import { AuthUser, Cycle } from "../lib/types";
+import { AuthUser, Cycle, Nomination } from "../lib/types";
 import Card from "../components/Card";
 import Label from "../components/Label";
 import Pill from "../components/Pill";
@@ -76,6 +76,7 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
   const [selectedNomId, setSelectedNomId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [catFilter, setCatFilter] = useState("all");
+  const [citationModalNom, setCitationModalNom] = useState<Nomination | null>(null);
 
   // Filter pool candidates based on search & category filter
   const filteredPool = useMemo(() => {
@@ -365,15 +366,35 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
                           )}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          <span className="rounded bg-sky-100/70 border border-sky-200 px-2 py-0.5 text-[9px] font-bold text-sky-900 uppercase">
-                            {cat?.name || n.category}
-                          </span>
-                          {n.mafsValue && (
-                            <span className="rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-[9px] font-bold text-amber-900 truncate max-w-[150px]">
-                              {n.mafsValue}
+                        <div className="flex items-center justify-between gap-1.5 pt-1">
+                          <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                            <span className="rounded bg-sky-100/70 border border-sky-200 px-2 py-0.5 text-[9px] font-bold text-sky-900 uppercase">
+                              {cat?.name || n.category}
                             </span>
-                          )}
+                            {n.mafsValue && (
+                              <span className="rounded bg-amber-50 border border-amber-200 px-2 py-0.5 text-[9px] font-bold text-amber-900 truncate max-w-[110px]" title={n.mafsValue}>
+                                {n.mafsValue}
+                              </span>
+                            )}
+                            {n.hodComment && (
+                              <span className="inline-flex items-center gap-0.5 rounded bg-sky-50 border border-sky-200/80 px-1.5 py-0.5 text-[9px] font-bold text-sky-900" title={`HOD Feedback: ${n.hodComment}`}>
+                                <MessageSquare size={9} className="text-sky-700" />
+                                <span>HOD Note</span>
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedNomId(n.id);
+                              setCitationModalNom(n);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-blue-900/5 hover:bg-blue-900 hover:text-white text-[10px] font-bold text-blue-950 px-2 py-0.5 transition cursor-pointer border border-blue-900/10 shrink-0 shadow-2xs"
+                            title="View Citation & Impact Details"
+                          >
+                            <Eye size={10} /> Citation
+                          </button>
                         </div>
                       </div>
                     );
@@ -407,6 +428,15 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
                       <p className="text-[11px] text-slate-400">
                         Endorsed Nomination · Submitted {new Date(activeNom.submittedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
                       </p>
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setCitationModalNom(activeNom)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-900 hover:text-white transition shadow-2xs cursor-pointer"
+                        >
+                          <Eye size={13} /> View Full Citation &amp; Evidence
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -464,20 +494,64 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
                       </p>
                     </div>
                   )}
+
+                  {/* Supporting Evidence Link if provided */}
+                  {activeNom.evidence && (
+                    <div className="rounded-2xl border border-slate-200/80 bg-slate-50/40 p-4 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ExternalLink size={15} className="text-sky-700 shrink-0" />
+                        <span className="font-bold text-blue-950">Supporting Evidence Document:</span>
+                        <a
+                          href={activeNom.evidence.startsWith("http") ? activeNom.evidence : `https://${activeNom.evidence}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-sky-800 hover:text-sky-950 hover:underline truncate"
+                        >
+                          {activeNom.evidence}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* HOD Endorsement Remarks & Feedback */}
+                  {activeNom.hodComment && (
+                    <div className="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 via-blue-50/60 to-sky-50 p-5 space-y-2 shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare size={16} className="text-sky-700" />
+                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-sky-950">
+                          HOD Endorsement Remarks &amp; Feedback
+                        </h3>
+                      </div>
+                      <p className="text-xs text-blue-950 leading-relaxed whitespace-pre-wrap font-medium bg-white p-3.5 rounded-xl border border-sky-100 shadow-2xs">
+                        &ldquo;{activeNom.hodComment}&rdquo;
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. Panel Rating Out of 10 Controls */}
                 <div className="rounded-2xl border border-blue-900/15 bg-blue-950/[0.02] p-6 space-y-4">
-                  <div className="flex items-center justify-between border-b border-blue-900/10 pb-3">
+                  <div className="flex items-center justify-between border-b border-blue-900/10 pb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Star size={18} className="text-amber-500 fill-amber-400" />
                       <h3 className="text-sm font-extrabold text-blue-950">
                         Panel Judge Score Rating (Rate Out of 10)
                       </h3>
                     </div>
-                    <span className="text-xs font-bold text-blue-950">
-                      Score: <strong className="text-base text-blue-900">{activeScore !== undefined ? activeScore : "--"}</strong> / 10
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setCitationModalNom(activeNom)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-950 hover:bg-sky-100 hover:border-sky-400 transition shadow-2xs cursor-pointer"
+                        title="Read full citation, impact & evidence while rating"
+                      >
+                        <Eye size={13} className="text-sky-700" />
+                        <span>View Citation While Scoring</span>
+                      </button>
+                      <span className="text-xs font-bold text-blue-950">
+                        Score: <strong className="text-base text-blue-900">{activeScore !== undefined ? activeScore : "--"}</strong> / 10
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-xs text-slate-500">
@@ -544,6 +618,190 @@ export const JudgeView: React.FC<JudgeViewProps> = ({
                 hint="Choose a candidate from the left list to review their details and enter panel score."
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Panel Judge Full Citation & Dossier Modal */}
+      {citationModalNom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-5 text-blue-950">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A2540] text-white shadow-sm">
+                  <Award size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-blue-950">Nomination Citation &amp; Evidence</h3>
+                  <p className="text-xs text-slate-500">
+                    Category: <strong className="text-blue-900">{catById(citationModalNom.category)?.name || citationModalNom.category}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCitationModalNom(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Nominee Profile summary */}
+            <div className="rounded-xl border border-blue-900/10 bg-slate-50 p-4 space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h4 className="text-base font-extrabold text-blue-950">{citationModalNom.name}</h4>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Employee ID: <strong>{citationModalNom.code}</strong>
+                  </p>
+                </div>
+                <span className="rounded-full bg-sky-100 border border-sky-300 px-3 py-1 text-xs font-bold text-sky-950">
+                  {catById(citationModalNom.category)?.name || citationModalNom.category}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 pt-1 border-t border-slate-200/60">
+                {citationModalNom.gender && (
+                  <span><strong>Gender:</strong> {citationModalNom.gender}</span>
+                )}
+                <span><strong>Department:</strong> {unitById(citationModalNom.unit)?.name || citationModalNom.unit}</span>
+                {citationModalNom.location && (
+                  <span><strong>Location:</strong> {citationModalNom.location}</span>
+                )}
+                {citationModalNom.submittedAt && (
+                  <span>
+                    <strong>Submitted:</strong> {new Date(citationModalNom.submittedAt).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* MAFS Value Demonstrated */}
+            {citationModalNom.mafsValue && (
+              <div className="rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/60 border border-amber-200 p-4 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-900 uppercase tracking-wider">
+                  <Sparkles size={15} className="text-amber-600 shrink-0" />
+                  <span>MAFS Value Demonstrated</span>
+                </div>
+                <p className="text-sm font-bold text-amber-950">
+                  {citationModalNom.mafsValue}
+                </p>
+              </div>
+            )}
+
+            {/* Citation & Key Contributions */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600">
+                <FileText size={14} className="text-blue-700 shrink-0" />
+                <span>Projects Undertaken / Key Contribution</span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-900 leading-relaxed max-h-56 overflow-y-auto whitespace-pre-wrap font-sans shadow-inner">
+                {citationModalNom.citation || "No citation text provided."}
+              </div>
+            </div>
+
+            {/* Measurable Business Impact */}
+            {citationModalNom.businessImpact && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-900">
+                  <Award size={14} className="text-emerald-700 shrink-0" />
+                  <span>Business Impact &amp; Measurable Outcome</span>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 text-xs text-emerald-950 leading-relaxed max-h-44 overflow-y-auto whitespace-pre-wrap font-sans">
+                  {citationModalNom.businessImpact}
+                </div>
+              </div>
+            )}
+
+            {/* HOD Endorsement Remarks & Feedback */}
+            {citationModalNom.hodComment && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-950">
+                  <MessageSquare size={14} className="text-sky-700 shrink-0" />
+                  <span>HOD Endorsement Remarks &amp; Feedback</span>
+                </div>
+                <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4 text-xs text-blue-950 leading-relaxed max-h-44 overflow-y-auto whitespace-pre-wrap font-medium shadow-2xs">
+                  &ldquo;{citationModalNom.hodComment}&rdquo;
+                </div>
+              </div>
+            )}
+
+            {/* Supporting Evidence Link */}
+            {citationModalNom.evidence && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Supporting Evidence Link</span>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs flex items-center gap-2">
+                  <ExternalLink size={14} className="text-sky-700 shrink-0" />
+                  <a
+                    href={citationModalNom.evidence.startsWith("http") ? citationModalNom.evidence : `https://${citationModalNom.evidence}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-sky-800 hover:text-sky-950 hover:underline break-all truncate"
+                  >
+                    {citationModalNom.evidence}
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Score Candidate Directly from Modal */}
+            <div className="rounded-xl border border-blue-900/15 bg-blue-950/[0.03] p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Star size={15} className="text-amber-500 fill-amber-400" />
+                  <span className="text-xs font-extrabold text-blue-950">
+                    Rate This Candidate (Out of 10)
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-blue-950">
+                  Current Score:{" "}
+                  <strong className="text-sm text-blue-900">
+                    {(cycle.scores[citationModalNom.id] || {})[effectiveJudgeId] !== undefined
+                      ? (cycle.scores[citationModalNom.id] || {})[effectiveJudgeId]
+                      : "Not Scored"}
+                  </strong>
+                </span>
+              </div>
+              <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
+                  const curr = (cycle.scores[citationModalNom.id] || {})[effectiveJudgeId];
+                  const isSel = curr === num;
+                  return (
+                    <button
+                      key={num}
+                      type="button"
+                      disabled={!open}
+                      onClick={() => setScore(citationModalNom.id, num)}
+                      className={`h-9 rounded-lg text-xs font-extrabold transition active:scale-95 cursor-pointer ${
+                        isSel
+                          ? "bg-[#0A2540] text-white ring-2 ring-sky-400 shadow-sm"
+                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <span className="text-xs text-slate-400">
+                Scores save instantly upon selection.
+              </span>
+              <button
+                type="button"
+                onClick={() => setCitationModalNom(null)}
+                className="rounded-xl bg-[#0A2540] px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 transition cursor-pointer shadow-xs"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

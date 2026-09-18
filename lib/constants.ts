@@ -65,6 +65,7 @@ export const STAGES: Stage[] = [
 export const MAX_CATEGORIES_PER_FUNCTION = 2;
 export const MAX_CATEGORIES_PER_PLANT = 4;
 export const MAX_CATEGORIES_PER_UNIT = 2;
+export const MAX_NOMINATIONS_PER_EMPLOYEE = 2;
 export const PANEL_SIZE = 3;
 export const POINTS = 10;
 

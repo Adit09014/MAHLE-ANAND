@@ -288,6 +288,12 @@ export const NominateView: React.FC<NominateViewProps> = ({
           bad: true,
           text: `You have already filed a nomination under '${cat?.name}' for this month. You may edit your existing entry or nominate yourself in other categories.`,
         });
+      // Enforce maximum of two categories per month
+      if (userNominations.length >= 2)
+        return setMsg({
+          bad: true,
+          text: `You can nominate a maximum of two categories per month. Please edit an existing nomination to change categories.`,
+        });
     } else {
       // When editing and changing category, verify no other entry exists in target category
       if (userNominations.some((n) => n.id !== editingNomId && n.category === f.category)) {
