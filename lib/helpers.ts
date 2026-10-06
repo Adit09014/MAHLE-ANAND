@@ -3,24 +3,32 @@ import { CATEGORIES } from "./constants";
 
 export function getDefaultTimeline(month: string): CycleTimeline {
   const [year, mStr] = month.split("-");
-  const y = Number(year) || 2026;
-  const m = Number(mStr) || 8;
+  let y = Number(year) || 2026;
+  let m = Number(mStr) || 8;
+  
+  // Shift to the next month
+  m += 1;
+  if (m > 12) {
+    m = 1;
+    y += 1;
+  }
+  
   const pad = (n: number) => String(n).padStart(2, "0");
 
   return {
     nomination: {
       startDate: `${y}-${pad(m)}-01`,
-      endDate: `${y}-${pad(m)}-07`,
+      endDate: `${y}-${pad(m)}-10`,
       isExtended: false,
     },
     hodEndorsement: {
-      startDate: `${y}-${pad(m)}-08`,
-      endDate: `${y}-${pad(m)}-09`,
+      startDate: `${y}-${pad(m)}-10`,
+      endDate: `${y}-${pad(m)}-15`,
       isExtended: false,
     },
     panelScoring: {
-      startDate: `${y}-${pad(m)}-10`,
-      endDate: `${y}-${pad(m)}-12`,
+      startDate: `${y}-${pad(m)}-15`,
+      endDate: `${y}-${pad(m)}-18`,
       isExtended: false,
     },
   };
