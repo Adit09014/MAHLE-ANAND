@@ -208,6 +208,10 @@ export default function RRAdmin() {
       const nomMap = new Map<string, any>();
       (fresh.nominations || []).forEach((n: any) => nomMap.set(n.id, n));
       (next.nominations || []).forEach((n: any) => {
+        if (n._deleted) {
+          nomMap.set(n.id, n);
+          return;
+        }
         const existing = nomMap.get(n.id);
         if (!existing) {
           nomMap.set(n.id, n);
@@ -642,6 +646,7 @@ export default function RRAdmin() {
                   monthOptions={monthOptions}
                   cycle={cycle}
                   onNavigateToNominate={() => setRole("employee")}
+                  commit={commit}
                 />
               )}
               {activeRole === "history" && (isAdmin || isHR) && (

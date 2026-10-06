@@ -24,6 +24,7 @@ import {
   Send,
   Copy,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { unitById, catById, getDynamicUnits } from "../lib/constants";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty } from "../lib/helpers";
@@ -52,6 +53,7 @@ export interface AppliedDirectoryViewProps {
   monthOptions: Array<{ value: string; label: string }>;
   cycle: Cycle;
   onNavigateToNominate?: () => void;
+  commit?: (next: Cycle) => void;
 }
 
 export type PromptTemplateId = "approaching" | "extended" | "final_call" | "custom";
@@ -62,6 +64,7 @@ export const AppliedDirectoryView: React.FC<AppliedDirectoryViewProps> = ({
   setMonth,
   monthOptions,
   cycle,
+  commit,
 }) => {
   // State
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
@@ -79,6 +82,12 @@ export const AppliedDirectoryView: React.FC<AppliedDirectoryViewProps> = ({
   const [customSubject, setCustomSubject] = useState("");
   const [customBody, setCustomBody] = useState("");
   const [copiedAction, setCopiedAction] = useState<"emails" | "body" | "outlook" | null>(null);
+
+  // Delete Action States
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [adminPass, setAdminPass] = useState("");
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch all employees from master database
   const fetchEmployees = async () => {
@@ -723,13 +732,18 @@ HR & Recognition Committee`,
                       {/* 6. Action */}
                       <td className="px-4 py-3.5 text-right">
                         {emp.hasApplied ? (
-                          <button
-                            onClick={() => setSelectedNomination(emp.nominations[0])}
-                            className="inline-flex items-center gap-1 rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-900 hover:text-white transition active:scale-95 shadow-2xs cursor-pointer"
-                            title="View submitted citation details"
-                          >
-                            <Eye size={12} /> View Citation
-                          </button>
+                          <div className="flex flex-col items-end gap-1.5">
+                            {emp.nominations.map((nom) => (
+                              <button
+                                key={nom.id}
+                                onClick={() => setSelectedNomination(nom)}
+                                className="inline-flex items-center gap-1 rounded-xl border border-blue-900/15 bg-white px-3 py-1.5 text-[10px] font-bold text-blue-950 hover:bg-blue-900 hover:text-white transition active:scale-95 shadow-2xs cursor-pointer"
+                                title={`View submitted citation for ${catById(nom.category)?.name || nom.category}`}
+                              >
+                                <Eye size={12} /> View {catById(nom.category)?.name || nom.category}
+                              </button>
+                            ))}
+                          </div>
                         ) : (
                           <button
                             onClick={() => handleOpenReminderModal("single", emp)}
@@ -878,14 +892,115 @@ HR & Recognition Committee`,
             )}
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              {currentUser?.isAdmin && commit ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteTargetId(selectedNomination.id);
+                  }}
+                  className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 cursor-pointer flex items-center gap-1.5 transition-all"
+                >
+                  <Trash2 size={14} /> Delete Citation
+                </button>
+              ) : <div />}
               <button
                 type="button"
                 onClick={() => setSelectedNomination(null)}
-                className="rounded-xl bg-[#0A2540] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900 cursor-pointer"
+                className="rounded-xl bg-[#0A2540] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-900 cursor-pointer transition-all"
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Password Verification Modal for Deletion */}
+      {deleteTargetId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl text-blue-950">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-blue-950">Confirm Deletion</h3>
+                <p className="text-xs text-slate-500">Requires Admin authorization</p>
+              </div>
+            </div>
+
+            {adminError && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs text-red-700 border border-red-200">
+                <AlertTriangle size={14} className="shrink-0" />
+                <span>{adminError}</span>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Admin Password</label>
+                <input
+                  type="password"
+                  value={adminPass}
+                  onChange={(e) => setAdminPass(e.target.value)}
+                  placeholder="Enter admin password..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-blue-950 outline-none focus:border-blue-700 shadow-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => {
+                    setDeleteTargetId(null);
+                    setAdminPass("");
+                    setAdminError(null);
+                  }}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting || !adminPass.trim()}
+                  onClick={async () => {
+                    if (!commit) return;
+                    setIsDeleting(true);
+                    setAdminError(null);
+                    try {
+                      const response = await fetch("/api/auth/verify-admin-pass", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ adminPassword: adminPass.trim() }),
+                      });
+                      const data = await response.json();
+                      if (!response.ok) {
+                        setAdminError(data.error || "Incorrect Admin Password.");
+                        setIsDeleting(false);
+                      } else {
+                        // Authorized! Pass the _deleted flag
+                        const targetNom = cycle.nominations.find(n => n.id === deleteTargetId);
+                        if (targetNom) {
+                           const nextNoms = [...cycle.nominations.filter(n => n.id !== deleteTargetId), { ...targetNom, _deleted: true }];
+                           commit({ ...cycle, nominations: nextNoms });
+                        }
+                        setDeleteTargetId(null);
+                        setSelectedNomination(null);
+                        setAdminPass("");
+                        setIsDeleting(false);
+                      }
+                    } catch (e) {
+                      setAdminError("Network error.");
+                      setIsDeleting(false);
+                    }
+                  }}
+                  className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700 disabled:opacity-50 transition"
+                >
+                  {isDeleting ? "Deleting..." : "Delete Permanently"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

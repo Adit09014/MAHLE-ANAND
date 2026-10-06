@@ -84,15 +84,21 @@ export async function POST(
 
     // Preserve nominations list by ID without letting stale client state revert updated fields (like unit)
     const nomMap = new Map<string, any>();
-    (body.nominations || []).forEach((n: any) => nomMap.set(n.id, n));
+    (body.nominations || []).forEach((n: any) => {
+      if (!n._deleted) nomMap.set(n.id, n);
+    });
     (existing.nominations || []).forEach((n: any) => {
-      const incomingNom = nomMap.get(n.id);
+      const incomingNom = (body.nominations || []).find((inN: any) => inN.id === n.id);
       if (incomingNom) {
-        nomMap.set(n.id, {
-          ...n,
-          ...incomingNom,
-          unit: incomingNom.unit && incomingNom.unit !== "hr" ? incomingNom.unit : n.unit || incomingNom.unit,
-        });
+        if (incomingNom._deleted) {
+          nomMap.delete(n.id);
+        } else {
+          nomMap.set(n.id, {
+            ...n,
+            ...incomingNom,
+            unit: incomingNom.unit && incomingNom.unit !== "hr" ? incomingNom.unit : n.unit || incomingNom.unit,
+          });
+        }
       } else {
         nomMap.set(n.id, n);
       }

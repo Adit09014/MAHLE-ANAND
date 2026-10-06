@@ -43,6 +43,7 @@ export interface Nomination {
   validated: boolean | null;
   hrNote?: string;
   hodComment?: string;
+  _deleted?: boolean;
 }
 
 export interface PhaseTimeline {
