@@ -515,10 +515,13 @@ export const HrView: React.FC<HrViewProps> = ({
         points: 0,
         wins: [],
       };
-      const winExists = next[k].wins.some(
+      const existingWin = next[k].wins.find(
         (win) => win.month === cycle.month && win.category === w.nom.category
       );
-      if (!winExists) {
+      if (existingWin) {
+        existingWin.score = scoreVal;
+        existingWin.isWinner = isWinner;
+      } else {
         next[k].points = Math.round((next[k].points + scoreVal) * 10) / 10;
         next[k].wins.push({
           month: cycle.month,
@@ -566,10 +569,13 @@ export const HrView: React.FC<HrViewProps> = ({
         points: 0,
         wins: [],
       };
-      const winExists = next[k].wins.some(
+      const existingWin = next[k].wins.find(
         (win) => win.month === cycle.month && win.category === w.nom.category
       );
-      if (!winExists) {
+      if (existingWin) {
+        existingWin.score = scoreVal;
+        existingWin.isWinner = isWinner;
+      } else {
         next[k].points = Math.round((next[k].points + scoreVal) * 10) / 10;
         next[k].wins.push({
           month: cycle.month,
@@ -663,11 +669,12 @@ export const HrView: React.FC<HrViewProps> = ({
 
     Object.entries(points).forEach(([code, record]) => {
       const unitName = unitById(record.unit)?.name || record.unit;
-      const winsCount = record.wins?.length || 0;
+      const winningWins = record.wins?.filter((w) => w.isWinner) || [];
+      const winsCount = winningWins.length;
       const cumulativePoints = record.points || 0;
       const lsipWeightageScore = (cumulativePoints * 0.5).toFixed(1);
-      const winsHistory = record.wins
-        ?.map((w) => `${w.month}: ${catById(w.category)?.name || w.category}`)
+      const winsHistory = winningWins
+        .map((w) => `${w.month}: ${catById(w.category)?.name || w.category}`)
         .join(" | ");
 
       rows.push([

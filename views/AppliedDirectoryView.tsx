@@ -252,7 +252,6 @@ Eligible Categories:
 • Eagle Eye
 • Employee of the Month
 • Best New Comer
-• Learning Champion
 
 Take this opportunity to ensure your hard work and achievements are recognized!
 
@@ -296,7 +295,6 @@ Eligible Categories:
 • Eagle Eye
 • Employee of the Month
 • Best New Comer
-• Learning Champion
 
 Best regards,
 MAHLE ANAND Filter Systems

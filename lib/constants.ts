@@ -47,12 +47,6 @@ export const CATEGORIES: Category[] = [
     blurb:
       "A recent joiner with rapid, meaningful contribution and strong learning agility.",
   },
-  {
-    id: "learning",
-    name: "Learning Champion",
-    blurb:
-      "Pursued learning, applied new skills on the job, and shared knowledge to lift team capability.",
-  },
 ];
 
 export const STAGES: Stage[] = [
