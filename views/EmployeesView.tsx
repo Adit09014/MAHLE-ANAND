@@ -341,32 +341,32 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({ currentUser }) => 
   return (
     <div className="space-y-6">
       {/* 1. Header Banner */}
-      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
+      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-4 sm:p-5 lg:p-6 text-white shadow-xl relative overflow-hidden transition-all duration-200">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 sm:h-56 sm:w-56 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-10 h-28 w-28 sm:h-36 sm:w-36 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2.5 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
-              <ShieldCheck size={13} className="text-sky-300" />
-              <span>Admin Access Only</span>
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-6">
+          <div className="space-y-1 sm:space-y-1.5 max-w-2xl min-w-0">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/30 bg-sky-400/10 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+              <ShieldCheck size={11} className="text-sky-300 shrink-0" />
+              <span className="truncate">Admin Access Only</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-tight">
               Employee Directory &amp; User Administration
             </h1>
-            <p className="text-sm text-sky-100/80 leading-relaxed">
+            <p className="text-xs text-sky-100/80 leading-normal line-clamp-2 lg:line-clamp-none">
               Create, update, and manage employee master records, assign department affiliations, designate HODs and Panel Judges, and manage system login credentials.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 lg:gap-3 shrink-0">
             <button
               onClick={fetchEmployees}
               disabled={empLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-white/10 border border-white/20 px-3 py-2 sm:px-3.5 sm:py-2.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 active:scale-95 transition-all cursor-pointer shadow-xs whitespace-nowrap"
               title="Refresh employee directory"
             >
-              <RefreshCw size={14} className={empLoading ? "animate-spin" : ""} />
+              <RefreshCw size={13} className={empLoading ? "animate-spin shrink-0" : "shrink-0"} />
               Refresh
             </button>
             <button
@@ -381,9 +381,9 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({ currentUser }) => 
                 setAddGender("");
                 setAddMsg(null);
               }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 text-amber-950 px-4 py-2.5 text-xs font-bold uppercase tracking-wider shadow-md hover:bg-amber-300 active:scale-95 transition-all cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-amber-400 text-amber-950 px-3 py-2 sm:px-3.5 sm:py-2.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-md hover:bg-amber-300 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
-              <UserPlus size={15} /> Add New Employee
+              <UserPlus size={14} className="shrink-0" /> Add New Employee
             </button>
           </div>
         </div>

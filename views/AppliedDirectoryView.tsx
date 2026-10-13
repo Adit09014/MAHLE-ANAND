@@ -409,20 +409,20 @@ HR & Recognition Committee`,
   return (
     <div className="space-y-6">
       {/* 1. Header Banner with Month Selector */}
-      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-sky-400/10 blur-2xl pointer-events-none" />
+      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-4 sm:p-5 lg:p-6 text-white shadow-xl relative overflow-hidden transition-all duration-200">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 sm:h-56 sm:w-56 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-10 h-28 w-28 sm:h-36 sm:w-36 rounded-full bg-sky-400/10 blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2.5 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-emerald-300 backdrop-blur-md">
-              <Sparkles size={13} className="text-emerald-300" />
-              <span>Nomination Participation Directory</span>
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-6">
+          <div className="space-y-1 sm:space-y-1.5 max-w-2xl min-w-0">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-300 backdrop-blur-md">
+              <Sparkles size={11} className="text-emerald-300 shrink-0" />
+              <span className="truncate">Nomination Participation Directory</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-tight">
               Applied Employees Tracker
             </h1>
-            <p className="text-sm text-sky-100/80 leading-relaxed">
+            <p className="text-xs text-sky-100/80 leading-normal line-clamp-2 lg:line-clamp-none">
               Real-time directory tracking which eligible employees have filled their self-nominations for the selected cycle.
               Department Heads (HODs) are excluded because they evaluate instead of filing self-nominations.
               Employees with completed nominations are highlighted with a distinct <strong className="text-emerald-300 font-bold">Green ID</strong>.

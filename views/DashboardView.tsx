@@ -28,6 +28,7 @@ import { catById, unitById, POINTS, STAGES, getMaxCategoriesForUnit, getDynamicU
 import { Cycle, PointsState, AuthUser, Unit, Nomination } from "../lib/types";
 import {
   results,
+  getTopWinners,
   endorsedList,
   panelScore,
   getCycleTimeline,
@@ -245,17 +246,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (!isDeclared || !categoryResults) return [];
     const winsArr: string[] = [];
     categoryResults.forEach((catRes) => {
-      const winnerNom = catRes.ranked[0]?.nom;
-      if (
-        winnerNom &&
-        (winnerNom.code.toUpperCase() === userCode ||
-          winnerNom.name.toLowerCase().trim() === userName.toLowerCase().trim())
-      ) {
-        const title = catRes.slotLabel
-          ? `${catRes.category.name} (${catRes.slotLabel})`
-          : catRes.category.name;
-        winsArr.push(title);
-      }
+      const catWinners = catRes.winners || getTopWinners(catRes.ranked);
+      catWinners.forEach((winner) => {
+        const winnerNom = winner.nom;
+        if (
+          winnerNom &&
+          (winnerNom.code.toUpperCase() === userCode ||
+            winnerNom.name.toLowerCase().trim() === userName.toLowerCase().trim())
+        ) {
+          const title = catRes.slotLabel
+            ? `${catRes.category.name} (${catRes.slotLabel})`
+            : catRes.category.name;
+          winsArr.push(title);
+        }
+      });
     });
     return winsArr;
   }, [isDeclared, categoryResults, userCode, userName]);
@@ -307,16 +311,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. Welcome Header Banner */}
-      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
+      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-4 sm:p-5 lg:p-6 text-white shadow-xl relative overflow-hidden transition-all duration-200">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 sm:h-56 sm:w-56 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-10 h-28 w-28 sm:h-36 sm:w-36 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2.5 max-w-2xl">
+        <div className="relative z-10 flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3.5 2xl:gap-6">
+          <div className="space-y-1 sm:space-y-1.5 max-w-2xl min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
-                <Sparkles size={13} className="text-sky-300" />
-                <span>
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/30 bg-sky-400/10 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+                <Sparkles size={11} className="text-sky-300 shrink-0" />
+                <span className="truncate">
                   {isAdmin
                     ? "MAHLE ANAND Filter System Admin Executive Dashboard"
                     : isHod
@@ -327,17 +331,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
               {/* Panel Judge Appointment Badge */}
               {isPanelJudge && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/40 bg-emerald-400/25 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-emerald-200 backdrop-blur-md shadow-sm">
-                  <Award size={13} className="text-emerald-300 shrink-0" />
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/40 bg-emerald-400/25 px-2.5 py-0.5 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-emerald-200 backdrop-blur-md shadow-sm">
+                  <Award size={11} className="text-emerald-300 shrink-0" />
                   <span>Appointed Panel Judge</span>
                 </div>
               )}
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-tight">
               Welcome back, <span className="text-sky-300">{userName}</span>
             </h1>
-            <p className="text-sm text-sky-100/80 leading-relaxed">
+            <p className="text-xs text-sky-100/80 leading-normal line-clamp-2 2xl:line-clamp-none">
               {isAdmin
                 ? "Executive overview of total nominations, department quota completions, panel judge assignments, and department leadership rankings."
                 : isHod
@@ -346,10 +350,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 pt-2 2xl:pt-0 border-t border-white/10 2xl:border-t-0">
             {/* Recognition Cycle Selector Pill */}
-            <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-xs font-semibold backdrop-blur-md shrink-0">
-              <Calendar size={15} className="text-sky-300" />
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-semibold backdrop-blur-md shrink-0">
+              <Calendar size={14} className="text-sky-300" />
               <span className="text-sky-100">Recognition Cycle:</span>
               {monthOptions && monthOptions.length > 0 && setMonth ? (
                 <select

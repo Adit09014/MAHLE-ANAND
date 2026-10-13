@@ -35,6 +35,8 @@ import {
 import { STAGES, PANEL_SIZE, POINTS, UNITS, CATEGORIES, catById, unitById, getDynamicUnits } from "../lib/constants";
 import {
   results,
+  getTopWinners,
+  isScoreTie,
   endorsedList,
   panelScore,
   getCycleTimeline,
@@ -97,6 +99,7 @@ export interface HrViewProps {
   onNavigateToEmployees?: () => void;
   onNavigateToApplied?: () => void;
   onNavigateToHistory?: () => void;
+  onNavigateToEndorse?: () => void;
 }
 
 export const HrView: React.FC<HrViewProps> = ({
@@ -113,6 +116,7 @@ export const HrView: React.FC<HrViewProps> = ({
   onNavigateToEmployees,
   onNavigateToApplied,
   onNavigateToHistory,
+  onNavigateToEndorse,
 }) => {
   const [logoDraft, setLogoDraft] = useState(brand.logoUrl || "");
   const [logoSaved, setLogoSaved] = useState(false);
@@ -500,7 +504,10 @@ export const HrView: React.FC<HrViewProps> = ({
     allScored.forEach((w) => {
       const k = w.nom.code;
       const scoreVal = Math.round(w.avg! * 10) / 10;
-      const isWinner = res.some((r) => r.ranked[0]?.nom?.id === w.nom.id);
+      const isWinner = res.some((r) => {
+        const catWinners = r.winners || getTopWinners(r.ranked);
+        return catWinners.some((cw) => cw.nom.id === w.nom.id);
+      });
 
       next[k] = next[k] || {
         name: w.nom.name,
@@ -548,7 +555,10 @@ export const HrView: React.FC<HrViewProps> = ({
     allScored.forEach((w) => {
       const k = w.nom.code;
       const scoreVal = Math.round(w.avg! * 10) / 10;
-      const isWinner = res.some((r) => r.ranked[0]?.nom?.id === w.nom.id);
+      const isWinner = res.some((r) => {
+        const catWinners = r.winners || getTopWinners(r.ranked);
+        return catWinners.some((cw) => cw.nom.id === w.nom.id);
+      });
 
       next[k] = next[k] || {
         name: w.nom.name,
@@ -600,9 +610,18 @@ export const HrView: React.FC<HrViewProps> = ({
         "Result",
       ],
     ];
-    res.forEach((r) =>
+    res.forEach((r) => {
+      const catWinners = r.winners || getTopWinners(r.ranked);
+      const winnerNomIds = new Set(catWinners.map((w) => w.nom.id));
+      const hasTie = catWinners.length > 1;
+
       r.ranked.forEach((x, i) => {
         const s = cycle.scores[x.nom.id] || {};
+        const isWinner = winnerNomIds.has(x.nom.id);
+        const resultLabel = isWinner
+          ? (hasTie ? "Winner (Tie)" : "Winner")
+          : "";
+
         rows.push([
           cycle.month,
           r.category.name,
@@ -614,10 +633,10 @@ export const HrView: React.FC<HrViewProps> = ({
           String(s.j2 ?? ""),
           String(s.j3 ?? ""),
           x.avg === null ? "" : x.avg.toFixed(2),
-          i === 0 && x.avg !== null ? "Winner" : "",
+          resultLabel,
         ]);
-      })
-    );
+      });
+    });
     const csv = rows
       .map((r) => r.map((c) => `"${String(c ?? "")}"`).join(","))
       .join("\n");
@@ -676,68 +695,74 @@ export const HrView: React.FC<HrViewProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. Header Banner */}
-      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
+      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-4 sm:p-5 lg:p-6 text-white shadow-xl relative overflow-hidden transition-all duration-200">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 sm:h-56 sm:w-56 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-10 h-28 w-28 sm:h-36 sm:w-36 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2.5 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
-              <Sparkles size={13} className="text-sky-300" />
-              <span>MAHLE ANAND Filter System HR Admin Console</span>
+        <div className="relative z-10 flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-3.5 2xl:gap-6">
+          <div className="space-y-1 sm:space-y-1.5 max-w-2xl min-w-0">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/30 bg-sky-400/10 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+              <Sparkles size={11} className="text-sky-300 shrink-0" />
+              <span className="truncate">MAHLE ANAND Filter System HR Admin Console</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-tight">
               HR Recognition Management &amp; System Controls
             </h1>
-            <p className="text-sm text-sky-100/80 leading-relaxed">
+            <p className="text-xs text-sky-100/80 leading-normal max-w-2xl line-clamp-2 2xl:line-clamp-none">
               Control active cycle stages, extend nomination deadlines, assign panel judges, declare monthly winners, and manage department HODs.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0 pt-2.5 2xl:pt-0 border-t border-white/10 2xl:border-t-0">
             {onNavigateToEmployees && (
               <button
                 onClick={onNavigateToEmployees}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-400/20 border border-sky-300/30 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-sky-200 hover:bg-sky-400/30 active:scale-95 transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-400/20 border border-sky-300/30 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-sky-200 hover:bg-sky-400/30 active:scale-95 transition-all cursor-pointer shadow-xs whitespace-nowrap"
                 title="Open Employee Directory & User Administration"
               >
-                <Users size={15} /> Employee Directory
+                <Users size={13} className="shrink-0" />
+                <span><span className="hidden sm:inline">Employee </span>Directory</span>
               </button>
             )}
             <button
               onClick={exportNominationsCsv}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 active:scale-95 transition-all"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 border border-white/20 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 active:scale-95 transition-all shadow-xs whitespace-nowrap"
               title="Export complete list of all company nominations with citations"
             >
-              <FileText size={15} /> Export Nominations CSV
+              <FileText size={13} className="shrink-0" />
+              <span><span className="hidden sm:inline">Export </span>Nominations CSV</span>
             </button>
             <button
               onClick={exportCsv}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 active:scale-95 transition-all"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/10 border border-white/20 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 active:scale-95 transition-all shadow-xs whitespace-nowrap"
+              title="Export cycle CSV"
             >
-              <Download size={15} /> Export Cycle CSV
+              <Download size={13} className="shrink-0" />
+              <span><span className="hidden sm:inline">Export </span>Cycle CSV</span>
             </button>
             <button
               onClick={exportAnnualLedgerCsv}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 text-amber-950 px-4 py-2.5 text-xs font-bold uppercase tracking-wider shadow-md hover:bg-amber-300 active:scale-95 transition-all"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-400 text-amber-950 px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider shadow-md hover:bg-amber-300 active:scale-95 transition-all whitespace-nowrap"
+              title="Export LSIP Ledger CSV"
             >
-              <Trophy size={15} /> Export LSIP Ledger
+              <Trophy size={13} className="shrink-0" />
+              <span><span className="hidden sm:inline">Export </span>LSIP Ledger</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* 2. Admin Stage Controls & Metric Summary Cards */}
-      <Card className="p-6 border border-blue-900/10 shadow-sm bg-white space-y-4">
+      <Card className="p-4 sm:p-5 border border-blue-900/10 shadow-sm bg-white space-y-3.5">
         {stageSuccessMsg && (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-900 animate-in fade-in">
-            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-xs font-medium text-emerald-900 animate-in fade-in">
+            <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
             <span>{stageSuccessMsg}</span>
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-900/10 pb-5">
-          <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-900/10 pb-4">
+          <div className="space-y-2">
             {month && setMonth && monthOptions && (
               <div className="flex items-center gap-2.5">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-blue-950 flex items-center gap-1.5">
@@ -846,13 +871,26 @@ export const HrView: React.FC<HrViewProps> = ({
             <span className="text-[11px] text-indigo-700 font-medium">Applied Nominations</span>
           </div>
 
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-1">
+          <div
+            onClick={onNavigateToEndorse}
+            className={`rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-1 transition ${
+              onNavigateToEndorse ? "cursor-pointer hover:bg-emerald-100/70 hover:border-emerald-300 shadow-2xs" : ""
+            }`}
+            title={onNavigateToEndorse ? "Click to view and manage HOD Endorsements" : undefined}
+          >
             <div className="flex items-center justify-between text-emerald-900/70">
               <span className="text-[11px] font-bold uppercase tracking-wider">HOD Endorsed</span>
               <ShieldCheck size={18} className="text-emerald-600" />
             </div>
             <p className="text-2xl font-black text-blue-950">{pool.length}</p>
-            <span className="text-[11px] text-emerald-700 font-medium">Endorsed Candidates</span>
+            <div className="flex items-center justify-between text-[11px] text-emerald-700 font-medium">
+              <span>Endorsed Candidates</span>
+              {onNavigateToEndorse && (
+                <span className="inline-flex items-center gap-0.5 font-bold hover:underline">
+                  Manage <ChevronRight size={12} />
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 space-y-1">
@@ -1228,35 +1266,60 @@ export const HrView: React.FC<HrViewProps> = ({
                 </p>
               ) : (
                 <ul className="mt-3 space-y-2">
-                  {r.ranked.map((x, i) => (
-                    <li
-                      key={x.nom.id}
-                      className="flex items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-900/10 text-xs font-bold text-blue-950">
-                          #{i + 1}
-                        </span>
-                        <div>
-                          <strong className="block text-xs font-bold text-blue-950">{x.nom.name}</strong>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {unitById(x.nom.unit)?.name} ({x.nom.code})
+                  {r.ranked.map((x, i) => {
+                    const catWinners = r.winners || getTopWinners(r.ranked);
+                    const isWinner = catWinners.some((cw) => cw.nom.id === x.nom.id);
+                    const isTie = isWinner && catWinners.length > 1;
+                    const rankNumber =
+                      x.avg === null
+                        ? i + 1
+                        : r.ranked.filter(
+                            (other) =>
+                              other.avg !== null &&
+                              (other.avg ?? -1) > (x.avg ?? -1) &&
+                              !isScoreTie(other.avg, x.avg)
+                          ).length + 1;
+
+                    return (
+                      <li
+                        key={x.nom.id}
+                        className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition ${
+                          isWinner && cycle.stage === "announced"
+                            ? "border-amber-300 bg-amber-50/50 hover:bg-amber-50"
+                            : "border-slate-100 bg-slate-50/50 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                              isWinner && cycle.stage === "announced"
+                                ? "bg-amber-400 text-amber-950 font-extrabold"
+                                : "bg-blue-900/10 text-blue-950"
+                            }`}
+                          >
+                            #{rankNumber}
+                          </span>
+                          <div>
+                            <strong className="block text-xs font-bold text-blue-950">{x.nom.name}</strong>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {unitById(x.nom.unit)?.name} ({x.nom.code})
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isWinner && cycle.stage === "announced" && (
+                            <Pill tone="gold">{isTie ? "Winner (Tie)" : "Winner"}</Pill>
+                          )}
+                          <span className="font-mono text-xs font-extrabold text-blue-950">
+                            {x.avg === null ? "—" : x.avg.toFixed(2)} Pts
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-400">
+                            ({x.count}/{PANEL_SIZE})
                           </span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {i === 0 && x.avg !== null && cycle.stage === "announced" && (
-                          <Pill tone="gold">Winner</Pill>
-                        )}
-                        <span className="font-mono text-xs font-extrabold text-blue-950">
-                          {x.avg === null ? "—" : x.avg.toFixed(2)} Pts
-                        </span>
-                        <span className="font-mono text-[10px] text-slate-400">
-                          ({x.count}/{PANEL_SIZE})
-                        </span>
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </Card>

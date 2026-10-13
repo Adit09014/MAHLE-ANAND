@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye, Sparkles, MessageSquare, Save, Check, FileText, Award, TrendingUp, ExternalLink, ChevronDown, ChevronUp, X, MapPin } from "lucide-react";
-import { unitById, CATEGORIES, getMaxCategoriesForUnit, STAGES } from "../lib/constants";
+import { Lock, Clock, Calendar, CheckCircle2, ShieldCheck, Eye, Sparkles, MessageSquare, Save, Check, FileText, Award, TrendingUp, ExternalLink, ChevronDown, ChevronUp, X, MapPin, Zap, RotateCcw } from "lucide-react";
+import { unitById, CATEGORIES, getMaxCategoriesForUnit, STAGES, getDynamicUnits } from "../lib/constants";
 import { Cycle, Nomination } from "../lib/types";
 import { getCycleTimeline, getEffectiveEndDate, formatDatePretty, isHodEndorsementOpen } from "../lib/helpers";
 import Card from "../components/Card";
@@ -17,6 +17,8 @@ export interface HodViewProps {
   unitId: string;
   locked: boolean;
   readOnly?: boolean;
+  isAdmin?: boolean;
+  onUnitChange?: (unitId: string) => void;
   month?: string;
   setMonth?: (m: string) => void;
   monthOptions?: { value: string; label: string }[];
@@ -28,6 +30,8 @@ export const HodView: React.FC<HodViewProps> = ({
   unitId,
   locked,
   readOnly = false,
+  isAdmin = false,
+  onUnitChange,
   month,
   setMonth,
   monthOptions
@@ -115,7 +119,53 @@ export const HodView: React.FC<HodViewProps> = ({
   const timeline = getCycleTimeline(cycle);
   const hodPhase = timeline.hodEndorsement;
   const effectiveEnd = getEffectiveEndDate(hodPhase);
-  const open = !locked && isHodEndorsementOpen(cycle);
+  const isReadOnly = isAdmin ? false : readOnly;
+  const open = !locked && (isAdmin || isHodEndorsementOpen(cycle));
+  const dynamicUnits = useMemo(() => getDynamicUnits(allEmployees), [allEmployees]);
+
+  const unendorsedEligibleCategories = useMemo(() => {
+    return CATEGORIES.filter((cat) => {
+      if (picks[cat.id]) return false;
+      const pool = mine.filter((n) => n.category === cat.id);
+      return pool.length > 0;
+    });
+  }, [picks, mine]);
+
+  const remainingQuota = Math.max(0, maxCategories - usedCats.length);
+
+  const handleEndorseAllEligible = () => {
+    if (isReadOnly || !open) return;
+    const next = { ...picks };
+    let currentUsed = Object.keys(next).filter((c) => next[c]).length;
+
+    CATEGORIES.forEach((cat) => {
+      if (currentUsed >= maxCategories) return;
+      if (next[cat.id]) return;
+      const pool = mine.filter((n) => n.category === cat.id);
+      if (pool.length > 0) {
+        next[cat.id] = pool[0].id;
+        currentUsed++;
+      }
+    });
+
+    commit({
+      ...cycle,
+      endorsed: { ...(cycle.endorsed || {}), [unitId]: next },
+    });
+  };
+
+  const handleWithdrawAll = () => {
+    if (isReadOnly || !open) return;
+    if (!window.confirm(`Withdraw all endorsements for ${unit?.name || unitId}?`)) return;
+    const next: Record<string, string> = {};
+    Object.keys(picks).forEach((catId) => {
+      next[catId] = "";
+    });
+    commit({
+      ...cycle,
+      endorsed: { ...(cycle.endorsed || {}), [unitId]: next },
+    });
+  };
 
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({});
@@ -133,7 +183,7 @@ export const HodView: React.FC<HodViewProps> = ({
   };
 
   const handleSaveComment = (nom: Nomination) => {
-    if (readOnly) return;
+    if (isReadOnly) return;
     setSavingId(nom.id);
     const draft = commentDrafts[nom.id] !== undefined ? commentDrafts[nom.id] : (nom.hodComment || "");
     const nextNoms = (cycle.nominations || []).map((item) =>
@@ -151,7 +201,7 @@ export const HodView: React.FC<HodViewProps> = ({
   };
 
   const toggle = (nom: Nomination) => {
-    if (readOnly || !open) return;
+    if (isReadOnly || !open) return;
     const next = { ...picks };
     if (next[nom.category] === nom.id) {
       next[nom.category] = ""; // Explicit withdrawal signal for server merge
@@ -179,38 +229,130 @@ export const HodView: React.FC<HodViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Read-Only Notice Banner for HR Admin */}
-      {readOnly && (
+      {/* Admin Endorsement Console Banner or Read-Only Notice */}
+      {isAdmin ? (
+        <div className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 p-4 sm:p-5 text-xs text-amber-950 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white font-bold shadow-xs shrink-0">
+                <ShieldCheck size={22} />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm sm:text-base text-amber-950 flex items-center gap-2">
+                  Admin Endorsement Console
+                  <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase text-amber-900 border border-amber-300">
+                    Full Admin Access
+                  </span>
+                </h3>
+                <p className="text-xs text-amber-900/80 leading-relaxed">
+                  As an Administrator, you have full authority to review, endorse, and withdraw nominations on behalf of any department.
+                </p>
+              </div>
+            </div>
+
+            {/* Department Quick Switcher */}
+            {onUnitChange && (
+              <div className="flex items-center gap-2 shrink-0">
+                <label className="text-xs font-extrabold uppercase tracking-wider text-amber-900">
+                  Department:
+                </label>
+                <select
+                  value={unitId}
+                  onChange={(e) => onUnitChange(e.target.value)}
+                  className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-950 shadow-xs outline-none focus:border-amber-600 cursor-pointer"
+                >
+                  {dynamicUnits.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({u.kind === "Plant" ? "Plant · Max 4" : "Function · Max 2"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Department Endorsement Overview Bar */}
+          <div className="pt-2.5 border-t border-amber-200/80">
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                Department Endorsement Status ({month || cycle.month}):
+              </span>
+              <span className="text-[11px] text-amber-800">
+                Click any department below to view and endorse candidates
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pt-1">
+              {dynamicUnits.map((u) => {
+                const uPicks = (cycle.endorsed || {})[u.id] || {};
+                const uEndorsedCount = Object.keys(uPicks).filter((c) => uPicks[c]).length;
+                const uMax = getMaxCategoriesForUnit(u.id);
+                const isSelected = (unitId || "").toLowerCase() === u.id.toLowerCase();
+                const isFull = uEndorsedCount >= uMax;
+
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => onUnitChange && onUnitChange(u.id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer ${
+                      isSelected
+                        ? "bg-amber-600 text-white shadow-xs ring-2 ring-amber-600/40"
+                        : isFull
+                        ? "bg-emerald-100 text-emerald-900 border border-emerald-300 hover:bg-emerald-200"
+                        : uEndorsedCount > 0
+                        ? "bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200"
+                        : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>{u.name}</span>
+                    <span
+                      className={`text-[10px] font-mono px-1 py-0.2 rounded ${
+                        isSelected
+                          ? "bg-amber-700 text-amber-100"
+                          : isFull
+                          ? "bg-emerald-200 text-emerald-900"
+                          : "bg-black/5 text-slate-600"
+                      }`}
+                    >
+                      {uEndorsedCount}/{uMax}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : isReadOnly ? (
         <div className="flex items-center gap-2.5 rounded-xl border border-sky-200 bg-sky-50 p-3.5 text-xs text-sky-950 font-semibold shadow-2xs">
           <Eye size={17} className="text-sky-700 shrink-0" />
           <span>
-            <strong>Read-Only Mode (HR Admin):</strong> You are inspecting HOD endorsements for {unit?.name || unitId}. Endorsements and withdrawals can only be performed by the designated Head of Department.
+            <strong>Read-Only Mode:</strong> You are inspecting HOD endorsements for {unit?.name || unitId}. Endorsements and withdrawals can only be performed by the designated Head of Department or System Administrator.
           </span>
         </div>
-      )}
+      ) : null}
 
       {/* 1. Header Banner */}
-      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute left-1/3 bottom-0 -mb-10 h-40 w-40 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
+      <div className="rounded-2xl border border-blue-900/10 bg-gradient-to-r from-[#0A2540] via-[#0F355C] to-[#0A2540] p-4 sm:p-5 lg:p-6 text-white shadow-xl relative overflow-hidden transition-all duration-200">
+        <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 sm:h-56 sm:w-56 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-10 h-28 w-28 sm:h-36 sm:w-36 rounded-full bg-blue-400/10 blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2.5 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/30 bg-sky-400/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
-              <Sparkles size={13} className="text-sky-300" />
-              <span>Head of Department Review Portal</span>
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-6">
+          <div className="space-y-1 sm:space-y-1.5 max-w-2xl min-w-0">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-300/30 bg-sky-400/10 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-sky-200 backdrop-blur-md">
+              <Sparkles size={11} className="text-sky-300 shrink-0" />
+              <span className="truncate">Head of Department Review Portal</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-black tracking-tight text-white leading-tight">
               HOD Candidate Endorsement
             </h1>
-            <p className="text-sm text-sky-100/80 leading-relaxed">
+            <p className="text-xs text-sky-100/80 leading-normal line-clamp-2 lg:line-clamp-none">
               Review and validate employee self-nominations from your department. Selected nominees advance to the HOD Panel Evaluation stage.
             </p>
           </div>
 
           {/* Month Selector Pill */}
-          <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2 text-xs font-semibold backdrop-blur-md shrink-0">
-            <Calendar size={15} className="text-sky-300" />
+          <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-semibold backdrop-blur-md shrink-0">
+            <Calendar size={14} className="text-sky-300" />
             <span className="text-sky-100">Recognition Cycle:</span>
             {monthOptions && monthOptions.length > 0 && setMonth ? (
               <select
@@ -254,29 +396,65 @@ export const HodView: React.FC<HodViewProps> = ({
         </div>
       </div>
 
-      <Card className="flex flex-wrap items-center gap-x-6 gap-y-3 p-5">
-        <div>
-          <Label>Endorsing as HOD</Label>
-          <p className="text-base font-semibold tracking-tight">
-            {unit ? (unit.kind === "Plant" ? `${unit.name} plant` : unit.name) : unitId}
-          </p>
+      <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 p-5">
+        <div className="space-y-1">
+          <Label>{isAdmin ? "Active Department for Endorsements" : "Endorsing as HOD"}</Label>
+          <div className="flex items-center gap-2">
+            <p className="text-base font-bold text-blue-950 tracking-tight">
+              {unit ? (unit.kind === "Plant" ? `${unit.name} plant` : unit.name) : unitId}
+            </p>
+            {isAdmin && (
+              <span className="rounded-full bg-amber-100 border border-amber-300 text-amber-900 px-2 py-0.5 text-[10px] font-extrabold uppercase">
+                Admin Editable
+              </span>
+            )}
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-6">
+
+        <div className="flex flex-wrap items-center gap-6">
           <div>
             <Label>Categories used</Label>
-            <p className="font-mono text-2xl leading-none tabular-nums">
+            <p className="font-mono text-2xl leading-none tabular-nums font-extrabold text-blue-950">
               {usedCats.length}
-              <span className="text-base text-blue-900/35">
+              <span className="text-base text-blue-900/35 font-normal">
                 /{maxCategories}
               </span>
             </p>
           </div>
           <div>
             <Label>Nominations received</Label>
-            <p className="font-mono text-2xl leading-none tabular-nums">
+            <p className="font-mono text-2xl leading-none tabular-nums font-extrabold text-blue-950">
               {mine.length}
             </p>
           </div>
+
+          {/* Quick Endorse All / Withdraw All buttons for Admin / HOD */}
+          {!isReadOnly && open && (
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+              {unendorsedEligibleCategories.length > 0 && remainingQuota > 0 && (
+                <button
+                  type="button"
+                  onClick={handleEndorseAllEligible}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white px-3 py-2 text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+                  title="Endorse the first nominee in each unendorsed category up to maximum quota"
+                >
+                  <Zap size={13} className="text-amber-400" />
+                  <span>Endorse Eligible ({Math.min(unendorsedEligibleCategories.length, remainingQuota)})</span>
+                </button>
+              )}
+              {usedCats.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleWithdrawAll}
+                  className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 px-2.5 py-2 text-xs font-bold transition shadow-2xs cursor-pointer active:scale-95"
+                  title="Withdraw all current endorsements for this department"
+                >
+                  <RotateCcw size={12} />
+                  <span>Withdraw All</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 
@@ -458,7 +636,7 @@ export const HodView: React.FC<HodViewProps> = ({
 
                     {/* Endorsement Actions */}
                     <div className="pt-2">
-                      {readOnly ? (
+                      {isReadOnly ? (
                         isPick ? (
                           <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 border border-emerald-300 px-3 py-1.5 text-xs font-extrabold text-emerald-900 shadow-2xs">
                             <CheckCircle2 size={13} className="text-emerald-700" /> Endorsed by HOD (Read-Only)
@@ -493,7 +671,7 @@ export const HodView: React.FC<HodViewProps> = ({
                         )}
                       </div>
 
-                      {readOnly ? (
+                      {isReadOnly ? (
                         n.hodComment ? (
                           <div className="rounded-lg bg-sky-50 border border-sky-200/80 p-2.5 text-xs text-sky-950 leading-relaxed">
                             <p className="italic font-medium">&ldquo;{n.hodComment}&rdquo;</p>
@@ -678,7 +856,7 @@ export const HodView: React.FC<HodViewProps> = ({
                 Close
               </button>
 
-              {!readOnly && (
+              {!isReadOnly && (
                 <Button
                   tone={picks[selectedNomination.category] === selectedNomination.id ? "danger" : "solid"}
                   onClick={() => {

@@ -98,8 +98,8 @@ export default function RRAdmin() {
 
   const monthOptions = useMemo(() => {
     const opts = [];
-    // Last 2 months (-2, -1), Current month (0), Next 3 months (+1, +2, +3)
-    for (let i = -2; i <= 3; i++) {
+    // Last 3 months (-3, -2, -1), Current month (0), Next 3 months (+1, +2, +3)
+    for (let i = -3; i <= 3; i++) {
       const d = new Date();
       d.setDate(1); // avoid 31st overflow
       d.setMonth(d.getMonth() + i);
@@ -347,7 +347,7 @@ export default function RRAdmin() {
           ? ["dashboard", "employee", "hod", "judge", "results", "hr", "applied", "history", "employees", "settings"]
           : ["dashboard", "employee", "hod", "results", "hr", "applied", "history", "employees", "settings"]
       : isHR
-        ? ["dashboard", "hr", "applied", "history", "results", "settings"]
+        ? ["dashboard", "hr", "hod", "applied", "history", "results", "settings"]
         : isHOD
           ? isPanelJudge
             ? ["dashboard", "hod", "judge", "results", "settings"]
@@ -462,7 +462,7 @@ export default function RRAdmin() {
       {/* Main Right Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header Bar */}
-        <header className="bg-white border-b border-slate-200/80 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+        <header className="bg-white border-b border-slate-200/80 px-4 sm:px-6 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
           {/* Left Side: Unit/Judge Selectors & Active Stage */}
           <div className="flex items-center gap-3 flex-wrap">
             {/* Unit selector for HOD or Admin */}
@@ -552,7 +552,7 @@ export default function RRAdmin() {
         </header>
 
         {/* Main View Content */}
-        <main className="flex-1 max-w-7xl w-full mx-auto p-5 md:p-8">
+        <main className="flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-4 md:p-5 lg:p-6 transition-all duration-200">
           {err && (
             <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
@@ -597,9 +597,12 @@ export default function RRAdmin() {
                   cycle={cycle}
                   commit={commit}
                   locked={locked}
+                  isAdmin={isAdmin}
+                  onUnitChange={setAsUnit}
                   readOnly={
-                    (currentUser?.role === "hr" || currentUser?.role === "admin")
-                    && !(currentUser?.isHOD && asUnit === currentUser?.unitId)
+                    !isAdmin &&
+                    currentUser?.role === "hr" &&
+                    !(currentUser?.isHOD && asUnit === currentUser?.unitId)
                   }
                   month={month}
                   setMonth={setMonth}
@@ -633,6 +636,7 @@ export default function RRAdmin() {
                   onNavigateToEmployees={isAdmin ? () => setRole("employees") : undefined}
                   onNavigateToApplied={() => setRole("applied")}
                   onNavigateToHistory={() => setRole("history")}
+                  onNavigateToEndorse={() => setRole("hod")}
                 />
               )}
               {activeRole === "employees" && isAdmin && (

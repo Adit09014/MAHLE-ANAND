@@ -128,6 +128,7 @@ export interface CategoryResult {
   category: Category;
   slotLabel: string | null;
   ranked: RankedNominee[];
+  winners?: RankedNominee[];
 }
 
 export interface EmployeeRecord {

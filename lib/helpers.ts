@@ -1,4 +1,4 @@
-import { Cycle, Nomination, PanelScoreResult, CategoryResult, CycleTimeline, PhaseTimeline } from "./types";
+import { Cycle, Nomination, PanelScoreResult, RankedNominee, CategoryResult, CycleTimeline, PhaseTimeline } from "./types";
 import { CATEGORIES } from "./constants";
 
 export function getDefaultTimeline(month: string): CycleTimeline {
@@ -181,6 +181,20 @@ export function endorsedList(cycle: Cycle): Nomination[] {
   return (cycle?.nominations || []).filter((n) => ids.includes(n.id));
 }
 
+export function isScoreTie(scoreA: number | null | undefined, scoreB: number | null | undefined): boolean {
+  if (scoreA === null || scoreA === undefined || scoreB === null || scoreB === undefined) {
+    return false;
+  }
+  return Math.abs(scoreA - scoreB) < 0.001;
+}
+
+export function getTopWinners(ranked: RankedNominee[]): RankedNominee[] {
+  if (!ranked || ranked.length === 0) return [];
+  const top = ranked[0];
+  if (top.avg === null || top.avg === undefined) return [];
+  return ranked.filter((x) => x.avg !== null && x.avg !== undefined && isScoreTie(x.avg, top.avg));
+}
+
 export function results(cycle: Cycle): CategoryResult[] {
   const out: CategoryResult[] = [];
   CATEGORIES.forEach((cat) => {
@@ -197,7 +211,8 @@ export function results(cycle: Cycle): CategoryResult[] {
         .filter(slot.filter)
         .map((n) => ({ nom: n, ...panelScore(cycle, n.id) }))
         .sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
-      out.push({ category: cat, slotLabel: slot.label, ranked });
+      const winners = getTopWinners(ranked);
+      out.push({ category: cat, slotLabel: slot.label, ranked, winners });
     });
   });
   return out;

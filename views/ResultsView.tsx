@@ -22,7 +22,7 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import { catById, unitById } from "../lib/constants";
-import { results } from "../lib/helpers";
+import { results, getTopWinners } from "../lib/helpers";
 import { Cycle, Nomination, EmployeeRecord } from "../lib/types";
 import Card from "../components/Card";
 import Label from "../components/Label";
@@ -49,6 +49,7 @@ export interface DeclaredWinnerInfo {
   email: string;
   unitName: string;
   designation: string;
+  isTie?: boolean;
 }
 
 export interface NonWinnerParticipantInfo {
@@ -120,28 +121,32 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
     return map;
   }, [employees]);
 
-  // 1. Declared winners resolution with verified work email
+  // 1. Declared winners resolution with verified work email (including ties)
   const declaredWinners: DeclaredWinnerInfo[] = useMemo(() => {
     const list: DeclaredWinnerInfo[] = [];
-    res.forEach((r, idx) => {
-      const winner = r.ranked[0];
-      if (winner && winner.nom) {
-        const emp = employeeMap.get((winner.nom.code || "").trim().toUpperCase());
-        const catName = r.slotLabel
-          ? `${r.category.name} (${r.slotLabel})`
-          : r.category.name;
-        list.push({
-          index: idx,
-          categoryName: catName,
-          categoryId: r.category.id,
-          slotLabel: r.slotLabel,
-          nom: winner.nom,
-          avg: winner.avg,
-          email: (emp?.email || "").trim(),
-          unitName: unitById(winner.nom.unit)?.name || winner.nom.unit,
-          designation: emp?.designation || "Staff Member",
-        });
-      }
+    let winnerIndex = 0;
+    res.forEach((r) => {
+      const catWinners = r.winners || getTopWinners(r.ranked);
+      catWinners.forEach((winner) => {
+        if (winner && winner.nom) {
+          const emp = employeeMap.get((winner.nom.code || "").trim().toUpperCase());
+          const catName = r.slotLabel
+            ? `${r.category.name} (${r.slotLabel})`
+            : r.category.name;
+          list.push({
+            index: winnerIndex++,
+            categoryName: catName,
+            categoryId: r.category.id,
+            slotLabel: r.slotLabel,
+            nom: winner.nom,
+            avg: winner.avg,
+            email: (emp?.email || "").trim(),
+            unitName: unitById(winner.nom.unit)?.name || winner.nom.unit,
+            designation: emp?.designation || "Staff Member",
+            isTie: catWinners.length > 1,
+          });
+        }
+      });
     });
     return list;
   }, [res, employeeMap]);
@@ -251,7 +256,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
     const winnersSummaryList = declaredWinners
       .map(
         (w, i) =>
-          `${i + 1}. ${w.nom.name} (${w.nom.code}) — ${w.categoryName} [${w.unitName}]`
+          `${i + 1}. ${w.nom.name} (${w.nom.code}) — ${w.categoryName}${w.isTie ? " (Joint Winner — Tie)" : ""} [${w.unitName}]`
       )
       .join("\n");
 
@@ -318,7 +323,7 @@ On behalf of the Executive Leadership and Management at MAHLE ANAND Filter Syste
 This recognition honors your exceptional work ethic, quality focus, and dedication to living MAHLE ANAND's core values.
 
 Recognition Summary:
-• Award Category: ${winner.categoryName}
+• Award Category: ${winner.categoryName}${winner.isTie ? " (Joint Winner — Tie)" : ""}
 • Recipient: ${winner.nom.name} (${winner.nom.code})
 • Department: ${winner.unitName}
 • Cycle: ${monthLabel}
@@ -343,10 +348,10 @@ MAHLE ANAND Filter Systems`,
 
 We are thrilled to formally inform you that you have won the prestigious "${winner.categoryName}" Award for the ${monthLabel} Corporate Rewards & Recognition cycle at MAHLE ANAND Filter Systems!
 
-Your exceptional performance, proactive initiatives, and high-impact contributions stood out to the evaluation panel and earned you the top score in this category.
+Your exceptional performance, proactive initiatives, and high-impact contributions stood out to the evaluation panel and earned you the top score${winner.isTie ? " (tied for 1st place)" : ""} in this category.
 
 Award Summary:
-• Award Category: ${winner.categoryName}
+• Award Category: ${winner.categoryName}${winner.isTie ? " (Joint Winner — Tie)" : ""}
 • Winner: ${winner.nom.name} (${winner.nom.code})
 • Department: ${winner.unitName}
 • Recognition Month: ${monthLabel}
@@ -783,13 +788,11 @@ Human Resources & Recognition Committee`,
         <div className="space-y-6">
           <div className="grid gap-5 md:grid-cols-2">
             {res.map((r, i) => {
-              const winner = r.ranked[0]; // Top scored candidate
+              const catWinners = r.winners || getTopWinners(r.ranked);
+              const isTie = catWinners.length > 1;
               const catName = r.slotLabel
                 ? `${r.category.name} (${r.slotLabel})`
                 : r.category.name;
-              const winnerEmp = winner?.nom?.code
-                ? employeeMap.get((winner.nom.code || "").toUpperCase())
-                : undefined;
 
               return (
                 <Card
@@ -801,48 +804,80 @@ Human Resources & Recognition Committee`,
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-900/50">
                         Award Category
                       </span>
-                      <h3 className="text-base font-bold text-blue-950">{catName}</h3>
+                      <h3 className="text-base font-bold text-blue-950 flex items-center gap-2 flex-wrap">
+                        <span>{catName}</span>
+                        {isTie && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">
+                            🤝 Joint Winners ({catWinners.length}-way Tie)
+                          </span>
+                        )}
+                      </h3>
                     </div>
                     <Award size={22} className="text-amber-500 shrink-0" />
                   </div>
 
-                  {winner && winner.nom ? (
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-lg font-extrabold text-blue-950">
-                            {winner.nom.name}
-                          </p>
-                          <p className="text-xs font-medium text-blue-900/60">
-                            Code: <span className="font-mono">{winner.nom.code}</span> ·{" "}
-                            {unitById(winner.nom.unit)?.name || winner.nom.unit}
-                            {winnerEmp?.email && (
-                              <span className="ml-2 font-normal text-sky-700">
-                                · {winnerEmp.email}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5">
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
-                            🏆 Winner
-                          </span>
-                          {canSendWinnerEmail && (
-                            <button
-                              onClick={() => handleOpenEmailModal("winners", i)}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-950 px-2.5 py-1 text-xs font-bold transition shadow-2xs cursor-pointer active:scale-95"
-                              title={`Send winner notification to ${winner.nom.name} via Outlook`}
-                            >
-                              <Mail size={13} className="text-blue-700" />
-                              <span>Email (Outlook)</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                  {catWinners.length > 0 ? (
+                    <div className="space-y-4 divide-y divide-blue-900/10">
+                      {catWinners.map((winner, winIdx) => {
+                        const winnerEmp = winner?.nom?.code
+                          ? employeeMap.get((winner.nom.code || "").toUpperCase())
+                          : undefined;
+                        const declaredW = declaredWinners.find(
+                          (dw) => dw.nom.id === winner.nom.id
+                        );
 
-                      <p className="rounded bg-blue-900/5 p-3 text-xs leading-relaxed text-blue-900/80 italic">
-                        &ldquo;{winner.nom.citation}&rdquo;
-                      </p>
+                        return (
+                          <div
+                            key={winner.nom.id}
+                            className={`space-y-3 ${winIdx > 0 ? "pt-4" : ""}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-lg font-extrabold text-blue-950">
+                                    {winner.nom.name}
+                                  </p>
+                                  {isTie && (
+                                    <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                      Tied Score ({winner.avg !== null ? winner.avg.toFixed(2) : "—"} Pts)
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs font-medium text-blue-900/60">
+                                  Code: <span className="font-mono">{winner.nom.code}</span> ·{" "}
+                                  {unitById(winner.nom.unit)?.name || winner.nom.unit}
+                                  {winnerEmp?.email && (
+                                    <span className="ml-2 font-normal text-sky-700">
+                                      · {winnerEmp.email}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1.5">
+                                <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                                  🏆 {isTie ? "Joint Winner" : "Winner"}
+                                </span>
+                                {canSendWinnerEmail && declaredW && (
+                                  <button
+                                    onClick={() =>
+                                      handleOpenEmailModal("winners", declaredW.index)
+                                    }
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-950 px-2.5 py-1 text-xs font-bold transition shadow-2xs cursor-pointer active:scale-95"
+                                    title={`Send winner notification to ${winner.nom.name} via Outlook`}
+                                  >
+                                    <Mail size={13} className="text-blue-700" />
+                                    <span>Email (Outlook)</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <p className="rounded bg-blue-900/5 p-3 text-xs leading-relaxed text-blue-900/80 italic">
+                              &ldquo;{winner.nom.citation}&rdquo;
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="py-6 text-center text-xs text-blue-900/50">
@@ -1011,7 +1046,7 @@ Human Resources & Recognition Committee`,
                     </option>
                     {declaredWinners.map((w) => (
                       <option key={w.index} value={w.index}>
-                        🏆 {w.nom.name} ({w.nom.code}) — {w.categoryName}{" "}
+                        🏆 {w.nom.name} ({w.nom.code}) — {w.categoryName}{w.isTie ? " [Tied Winner]" : ""}{" "}
                         {w.email ? `[${w.email}]` : "[No Email]"}
                       </option>
                     ))}
